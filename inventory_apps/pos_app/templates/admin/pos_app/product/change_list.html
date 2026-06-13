@@ -1,0 +1,30 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content %}
+<div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px;">
+    <h3 style="color: #0369a1; margin-top: 0; margin-bottom: 12px; font-size: 16px;">
+        📦 Bulk Product Management
+    </h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'admin:pos_app_product_download_template' %}" 
+           class="button" 
+           style="background: #16a34a; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;">
+            <span>⬇️</span> Download Template
+        </a>
+        
+        <a href="{% url 'admin:pos_app_product_bulk_upload' %}" 
+           class="button" 
+           style="background: #2563eb; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;">
+            <span>📤</span> Bulk Upload
+        </a>
+        
+        <a href="{% url 'admin:pos_app_product_export_excel' %}" 
+           class="button" 
+           style="background: #7c3aed; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;">
+            <span>📥</span> Export All Products
+        </a>
+    </div>
+</div>
+{{ block.super }}
+{% endblock %}

@@ -1,0 +1,4 @@
+django_tenants
+docs
+dts_test_project
+examples

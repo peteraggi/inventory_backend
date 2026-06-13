@@ -1,0 +1,172 @@
+name: inventory_backend_project
+
+networks:
+  inventory_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  static_files:
+    driver: local
+  media_files:
+    driver: local
+
+services:
+  postgres_db:
+    image: postgres:17-alpine
+    container_name: inventory_postgres_container
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-inventory_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-inventory@PG2026}
+      - POSTGRES_DB=${POSTGRES_DB:-inventory_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-inventory_user} -d ${POSTGRES_DB:-inventory_db}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis_cache:
+    image: redis:7-alpine
+    container_name: inventory_redis_container
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-inventory@Redis2026}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "-a",
+          "${REDIS_PASSWORD:-inventory@Redis2026}",
+          "ping",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  inventory_backend_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: inventory_backend_image
+    container_name: inventory_backend_container
+    command: /django.sh
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    ports:
+      - "${APP_PORT:-8400}:8400"
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-inventory_user}:${POSTGRES_PASSWORD:-inventory@PG2026}@postgres_db:5432/${POSTGRES_DB:-inventory_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-inventory@Redis2026}@redis_cache:6379/1
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check", "--database", "default"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery:
+    image: inventory_backend_image
+    container_name: inventory_celery_container
+    command: celery -A inventory_core worker -E -l info
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      inventory_backend_app:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-inventory_user}:${POSTGRES_PASSWORD:-inventory@PG2026}@postgres_db:5432/${POSTGRES_DB:-inventory_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-inventory@Redis2026}@redis_cache:6379/1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  beat:
+    image: inventory_backend_image
+    container_name: inventory_beat_container
+    command: celery -A inventory_core beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+      inventory_backend_app:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-inventory_user}:${POSTGRES_PASSWORD:-inventory@PG2026}@postgres_db:5432/${POSTGRES_DB:-inventory_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-inventory@Redis2026}@redis_cache:6379/1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
