@@ -1,8 +1,8 @@
 """
 Tenant schema URL configuration.
 This file is served for every request to a tenant subdomain
-(e.g. acme.api.inventory.com).
-Public-schema requests (api.inventory.com) go to urls_public.py instead.
+(e.g. acme.api.logsng.tech).
+Public-schema requests (api.logsng.tech) go to urls_public.py instead.
 """
 from django.contrib import admin
 from django.urls import path, include

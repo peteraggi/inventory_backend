@@ -13,6 +13,10 @@ volumes:
     driver: local
   media_files:
     driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
 
 services:
   postgres_db:
@@ -86,7 +90,7 @@ services:
     networks:
       - inventory_network
     ports:
-      - "${APP_PORT:-8400}:8400"
+      - "127.0.0.1:${APP_PORT:-8400}:8400"
     volumes:
       - static_files:/app/staticfiles
       - media_files:/app/media
@@ -136,6 +140,31 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-inventory_user}:${POSTGRES_PASSWORD:-inventory@PG2026}@postgres_db:5432/${POSTGRES_DB:-inventory_db}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-inventory@Redis2026}@redis_cache:6379/1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2
+    container_name: inventory_caddy_container
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      inventory_backend_app:
+        condition: service_healthy
+    env_file:
+      - .env
     logging:
       driver: "json-file"
       options:

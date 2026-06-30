@@ -1,0 +1,20 @@
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://inventory_backend_app:8400/internal/tls-ask/
+	}
+}
+
+http:// {
+	redir https://{host}{uri} permanent
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+
+	encode gzip
+
+	reverse_proxy inventory_backend_app:8400
+}

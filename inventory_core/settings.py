@@ -10,14 +10,17 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 
 AUTH_USER_MODEL = "authentication.User"
 
-# django-tenants: wildcard allows *.api.inventory.com and the root domain
+# Base domain tenants are provisioned under, e.g. {subdomain}.api.logsng.tech
+BASE_DOMAIN = config("BASE_DOMAIN", default="api.logsng.tech")
+
+# django-tenants: wildcard allows *.api.logsng.tech and the root domain
 ALLOWED_HOSTS = [
-    "api.inventory.com",
-    ".api.inventory.com",  # wildcard for all tenant subdomains
+    BASE_DOMAIN,
+    f".{BASE_DOMAIN}",  # wildcard for all tenant subdomains
     "localhost",
     ".localhost",
     "127.0.0.1",
-    "backend.inventory.com",
+    "inventory_backend_app",  # Caddy's on_demand_tls "ask" callback hits this internal name
 ]
 
 # ─── Multi-tenancy ────────────────────────────────────────────────────────────
@@ -154,14 +157,25 @@ CORS_ORIGIN_WHITELIST = [
     "http://localhost:8000",
     "http://localhost:8200",
     "http://127.0.0.1:8200",
-    "https://api.inventory.com",
     "http://127.0.0.1:8080",
-    "https://backend.inventory.com",
+    f"https://{BASE_DOMAIN}",
 ]
 
 CORS_ORIGIN_REGEX_WHITELIST = [
-    r"^https://[\w\-]+\.api\.inventory\.com$",  # all tenant subdomains
+    r"^https://[\w\-]+\.api\.logsng\.tech$",  # all tenant subdomains
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{BASE_DOMAIN}",
+    f"https://*.{BASE_DOMAIN}",
+]
+
+if not DEBUG:
+    # Hosted behind a TLS-terminating reverse proxy (nginx/Caddy/Cloudflare)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

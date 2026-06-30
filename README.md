@@ -11,7 +11,7 @@ A Django REST Framework backend that provisions isolated PostgreSQL schemas per 
 - [Getting Started (Development)](#getting-started-development)
 - [How Routing Works](#how-routing-works)
 - [Full API Reference](#full-api-reference)
-  - [Public Endpoints (api.inventory.com)](#public-endpoints)
+  - [Public Endpoints (api.logsng.tech)](#public-endpoints)
   - [Auth Endpoints (tenant subdomain)](#auth-endpoints)
   - [POS & Inventory Endpoints (tenant subdomain)](#pos--inventory-endpoints)
 - [Onboarding Flow](#onboarding-flow)
@@ -40,9 +40,9 @@ A Django REST Framework backend that provisions isolated PostgreSQL schemas per 
 └─────────────────────────────────────────────────────────┘
 
 Routing (subdomain-based):
-  api.inventory.com           → public schema (onboarding, plans)
-  acme.api.inventory.com      → acme schema   (auth, POS, reports)
-  lagosmart.api.inventory.com → lagosmart schema
+  api.logsng.tech           → public schema (onboarding, plans)
+  acme.api.logsng.tech      → acme schema   (auth, POS, reports)
+  lagosmart.api.logsng.tech → lagosmart schema
 ```
 
 **Stack:** Django 5 · DRF · django-tenants · PostgreSQL · Redis (cache + Celery) · JWT (simplejwt) · Resend (email) · Docker
@@ -87,9 +87,9 @@ Copy `.env.example` to `.env` (see [Environment Variables](#environment-variable
 Add to `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts` on Windows):
 
 ```
-127.0.0.1   api.inventory.com
-127.0.0.1   acme.api.inventory.com
-127.0.0.1   testclient.api.inventory.com
+127.0.0.1   api.logsng.tech
+127.0.0.1   acme.api.logsng.tech
+127.0.0.1   testclient.api.logsng.tech
 ```
 
 ### Database setup + run
@@ -136,9 +136,9 @@ PostgreSQL schema before the view runs. No code changes needed per tenant.
 
 | Request host                  | Schema used | URL conf used           |
 |-------------------------------|-------------|-------------------------|
-| `api.inventory.com`           | `public`    | `urls_public.py`        |
-| `acme.api.inventory.com`      | `acme`      | `urls.py` (tenant)      |
-| `testclient.api.inventory.com`| `testclient`| `urls.py` (tenant)      |
+| `api.logsng.tech`           | `public`    | `urls_public.py`        |
+| `acme.api.logsng.tech`      | `acme`      | `urls.py` (tenant)      |
+| `testclient.api.logsng.tech`| `testclient`| `urls.py` (tenant)      |
 
 ---
 
@@ -146,7 +146,7 @@ PostgreSQL schema before the view runs. No code changes needed per tenant.
 
 ### Public Endpoints
 
-Base URL: `https://api.inventory.com`
+Base URL: `https://api.logsng.tech`
 
 #### List subscription plans
 ```
@@ -196,7 +196,7 @@ Response `201`:
     "id": "uuid",
     "business_name": "Acme Retail",
     "subdomain": "acme",
-    "api_base_url": "https://acme.api.inventory.com",
+    "api_base_url": "https://acme.api.logsng.tech",
     "plan": "free",
     "on_trial": true,
     "trial_ends": "2026-07-12"
@@ -218,7 +218,7 @@ After onboarding the owner is **already logged in** — use the tokens immediate
 
 ### Auth Endpoints
 
-Base URL: `https://{subdomain}.api.inventory.com`
+Base URL: `https://{subdomain}.api.logsng.tech`
 
 All auth endpoints are under `/auth/`.
 
@@ -327,7 +327,7 @@ PATCH /auth/password-reset-complete/
 
 ### POS & Inventory Endpoints
 
-Base URL: `https://{subdomain}.api.inventory.com`
+Base URL: `https://{subdomain}.api.logsng.tech`
 
 All endpoints require `Authorization: Bearer <access_token>` unless noted.
 
@@ -504,12 +504,12 @@ GET  /pos/sync/history/           — last 20 sync log entries
 1. GET  /plans/                     → show plans to prospective customer
 2. POST /onboard/                   → create tenant, schema, owner account
    ↳ returns JWT tokens (owner is logged in immediately)
-3. GET  {subdomain}.api.inventory.com/pos/stores/   → get store_id
-4. GET  {subdomain}.api.inventory.com/pos/roles/    → get role IDs
-5. POST {subdomain}.api.inventory.com/auth/register/ → add staff members
-6. POST {subdomain}.api.inventory.com/pos/categories/ → create categories
-7. POST {subdomain}.api.inventory.com/pos/products/   → add inventory
-8. POST {subdomain}.api.inventory.com/pos/invoices/   → start selling
+3. GET  {subdomain}.api.logsng.tech/pos/stores/   → get store_id
+4. GET  {subdomain}.api.logsng.tech/pos/roles/    → get role IDs
+5. POST {subdomain}.api.logsng.tech/auth/register/ → add staff members
+6. POST {subdomain}.api.logsng.tech/pos/categories/ → create categories
+7. POST {subdomain}.api.logsng.tech/pos/products/   → add inventory
+8. POST {subdomain}.api.logsng.tech/pos/invoices/   → start selling
 ```
 
 ---
@@ -623,8 +623,8 @@ python manage.py makemigrations pos_app
 
 ## Swagger / API Docs
 
-- Public schema: `https://api.inventory.com/` → Swagger UI
-- Tenant schema: `https://{subdomain}.api.inventory.com/` → Swagger UI
+- Public schema: `https://api.logsng.tech/` → Swagger UI
+- Tenant schema: `https://{subdomain}.api.logsng.tech/` → Swagger UI
 
 Both include Bearer token authentication support.
 
