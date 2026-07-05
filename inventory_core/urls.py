@@ -15,6 +15,12 @@ from drf_yasg import openapi
 
 from inventory_core import settings
 
+# Define API patterns first so swagger only documents these routes.
+_tenant_api_patterns = [
+    path('auth/', include('inventory_apps.authentication.urls')),
+    path('pos/', include('inventory_apps.pos_app.urls')),
+]
+
 schema_view = get_schema_view(
     openapi.Info(
         title='LogsInventory Tenant API',
@@ -26,6 +32,7 @@ schema_view = get_schema_view(
     public=True,
     permission_classes=[permissions.AllowAny],
     authentication_classes=[],
+    patterns=_tenant_api_patterns,
 )
 
 
@@ -49,11 +56,7 @@ urlpatterns = [
     path('api/api.json/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 
-    # Authentication — register, login, logout, verify, password reset, token refresh
-    path('auth/', include('inventory_apps.authentication.urls')),
-
-    # POS & Inventory — stores, roles, categories, products, invoices, reports, sync
-    path('pos/', include('inventory_apps.pos_app.urls')),
+    *_tenant_api_patterns,
 ]
 
 if settings.DEBUG:

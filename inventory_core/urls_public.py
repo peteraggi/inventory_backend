@@ -15,6 +15,12 @@ from drf_yasg import openapi
 
 from inventory_apps.clients.models import Domain
 
+# Define API patterns first so swagger only documents these routes,
+# not the tenant URL conf that get_schema_view would pick up by default.
+_public_api_patterns = [
+    path("platform/", include("inventory_apps.clients.urls")),
+]
+
 schema_view = get_schema_view(
     openapi.Info(
         title="LogsInventory Platform API",
@@ -25,7 +31,7 @@ schema_view = get_schema_view(
     public=True,
     permission_classes=[permissions.AllowAny],
     authentication_classes=[],
-    # url='https://localhost:',
+    patterns=_public_api_patterns,
 )
 
 
