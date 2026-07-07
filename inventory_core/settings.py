@@ -154,15 +154,19 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = FILE_UPLOAD_MAX_MEMORY_SIZE
 
 
 CORS_ORIGIN_WHITELIST = [
+    "http://localhost:3000",
     "http://localhost:8000",
     "http://localhost:8200",
     "http://127.0.0.1:8200",
     "http://127.0.0.1:8080",
     f"https://{BASE_DOMAIN}",
+    "https://logsng.tech",
+    "https://www.logsng.tech",
 ]
 
 CORS_ORIGIN_REGEX_WHITELIST = [
     r"^https://[\w\-]+\.api\.logsng\.tech$",  # all tenant subdomains
+    r"^https://[\w\-]+\.logsng\.tech$",        # any other frontend subdomains
 ]
 
 CSRF_TRUSTED_ORIGINS = [
