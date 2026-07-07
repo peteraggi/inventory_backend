@@ -5,16 +5,32 @@
 	}
 }
 
+# Redirect all HTTP → HTTPS
 http:// {
 	redir https://{host}{uri} permanent
 }
 
-https:// {
+# ── Frontend ─────────────────────────────────────────────────────────────────
+# logsng.tech and www.logsng.tech → Next.js container
+logsng.tech, www.logsng.tech {
+	encode gzip
+	reverse_proxy logs_frontend:3000
+}
+
+# ── Backend: public API ───────────────────────────────────────────────────────
+# api.logsng.tech → Django (public schema: onboarding + plans)
+api.logsng.tech {
+	encode gzip
+	reverse_proxy inventory_backend_app:8400
+}
+
+# ── Backend: tenant subdomains ────────────────────────────────────────────────
+# *.api.logsng.tech → Django (tenant schema: auth + pos)
+# on_demand TLS provisions a cert per subdomain, controlled by the tls-ask callback
+*.api.logsng.tech {
 	tls {
 		on_demand
 	}
-
 	encode gzip
-
 	reverse_proxy inventory_backend_app:8400
 }
