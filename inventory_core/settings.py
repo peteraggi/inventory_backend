@@ -169,6 +169,15 @@ CORS_ORIGIN_REGEX_WHITELIST = [
     r"^https://[\w\-]+\.logsng\.tech$",        # any other frontend subdomains
 ]
 
+# Explicitly list allowed request headers so browser preflights pass.
+# The default set from corsheaders already includes authorization and content-type;
+# listing them here makes the policy visible and easy to extend.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-tenant-subdomain",  # kept for non-browser / Postman clients
+]
+
 CSRF_TRUSTED_ORIGINS = [
     f"https://{BASE_DOMAIN}",
     f"https://*.{BASE_DOMAIN}",
