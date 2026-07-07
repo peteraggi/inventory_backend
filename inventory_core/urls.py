@@ -6,14 +6,13 @@ Public-schema requests (api.logsng.tech) go to urls_public.py instead.
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.http import JsonResponse
-from django.db import connection
 from rest_framework import permissions
 from rest_framework_simplejwt.views import TokenRefreshView
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 from inventory_core import settings
+from inventory_core.views import health_check, tls_ask
 
 # Define API patterns first so swagger only documents these routes.
 _tenant_api_patterns = [
@@ -36,20 +35,10 @@ schema_view = get_schema_view(
 )
 
 
-def health_check(request):
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute('SELECT 1')
-        return JsonResponse(
-            {'status': 'healthy', 'schema': connection.schema_name}, status=200
-        )
-    except Exception as e:
-        return JsonResponse({'status': 'unhealthy', 'error': str(e)}, status=500)
-
-
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health_check'),
+    path('internal/tls-ask/', tls_ask, name='tls_ask'),
 
     # Swagger
     path('', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

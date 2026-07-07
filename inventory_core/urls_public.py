@@ -4,16 +4,13 @@ Handles requests to the root domain (api.logsng.tech) — onboarding and plans.
 Tenant-specific requests (acme.api.logsng.tech) use urls.py instead.
 """
 
-from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
-from django.db import connection
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-from inventory_apps.clients.models import Domain
+from inventory_core.views import health_check, tls_ask
 
 # Define API patterns first so swagger only documents these routes,
 # not the tenant URL conf that get_schema_view would pick up by default.
@@ -33,35 +30,6 @@ schema_view = get_schema_view(
     authentication_classes=[],
     patterns=_public_api_patterns,
 )
-
-
-def health_check(request):
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-        return JsonResponse(
-            {"status": "healthy", "schema": connection.schema_name}, status=200
-        )
-    except Exception as e:
-        return JsonResponse({"status": "unhealthy", "error": str(e)}, status=500)
-
-
-def tls_ask(request):
-    """
-    Caddy on_demand_tls "ask" callback — called before issuing a
-    Let's Encrypt cert for a hostname it hasn't seen before. Only the
-    base domain and subdomains with a provisioned tenant Domain are allowed,
-    so a guessed/unowned subdomain can't burn ACME issuance quota.
-    """
-    domain = request.GET.get("domain", "").lower().strip()
-    base_domain = settings.BASE_DOMAIN
-    if domain == base_domain:
-        return HttpResponse("ok")
-    if domain.endswith(f".{base_domain}") and Domain.objects.filter(
-        domain=domain
-    ).exists():
-        return HttpResponse("ok")
-    return HttpResponseForbidden("domain not permitted")
 
 
 urlpatterns = [
