@@ -25,9 +25,14 @@ api.logsng.tech {
 }
 
 # ── Backend: tenant subdomains ────────────────────────────────────────────────
-# *.api.logsng.tech → Django (tenant schema: auth + pos)
-# on_demand TLS provisions a cert per subdomain, controlled by the tls-ask callback
-*.api.logsng.tech {
+# Catch-all handles any hostname not matched by the named blocks above.
+# on_demand TLS provisions an individual cert per subdomain via HTTP-01 challenge;
+# the tls-ask callback gates which hostnames get certs.
+#
+# IMPORTANT: Do NOT use *.api.logsng.tech here — Caddy treats that as a wildcard
+# site address and requests a wildcard cert (requires DNS-01 ACME challenge).
+# The catch-all https:// + on_demand combo issues individual certs per subdomain.
+https:// {
 	tls {
 		on_demand
 	}
