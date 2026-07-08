@@ -146,6 +146,38 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  tls_ask_service:
+    build:
+      context: ./tls_ask_service
+      dockerfile: Dockerfile
+    image: inventory_tls_ask_image
+    container_name: inventory_tls_ask_container
+    restart: unless-stopped
+    networks:
+      - inventory_network
+    environment:
+      DB_HOST: postgres_db
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-inventory_db}
+      DB_USER: ${POSTGRES_USER:-inventory_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-inventory@PG2026}
+      ALLOWED_PARENT_DOMAIN: ${BASE_DOMAIN:-api.logsng.tech}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   caddy:
     image: caddy:2
     container_name: inventory_caddy_container
@@ -162,6 +194,8 @@ services:
       - caddy_config:/config
     depends_on:
       inventory_backend_app:
+        condition: service_healthy
+      tls_ask_service:
         condition: service_healthy
     env_file:
       - .env
