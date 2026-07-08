@@ -10,7 +10,7 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-from inventory_core.views import health_check, tls_ask
+from inventory_core.views import health_check
 
 # Define API patterns first so swagger only documents these routes,
 # not the tenant URL conf that get_schema_view would pick up by default.
@@ -35,7 +35,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health_check, name="health_check"),
-    path("internal/tls-ask/", tls_ask, name="tls_ask"),
+    path("internal/", include("inventory_apps.infrastructure.caddy.urls")),
     # Swagger (public)
     path("", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
     path("api/api.json/", schema_view.without_ui(cache_timeout=0), name="schema-json"),

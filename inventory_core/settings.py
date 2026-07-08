@@ -13,6 +13,11 @@ AUTH_USER_MODEL = "authentication.User"
 # Base domain tenants are provisioned under, e.g. {subdomain}.api.logsng.tech
 BASE_DOMAIN = config("BASE_DOMAIN", default="api.logsng.tech")
 
+# Parent domain the Caddy tls-ask endpoint uses to validate tenant subdomains.
+# Caddy will only be allowed to provision certs for <subdomain>.<CADDY_ALLOWED_PARENT_DOMAIN>.
+# Defaults to BASE_DOMAIN, so no extra env var is needed in the common case.
+CADDY_ALLOWED_PARENT_DOMAIN = config("CADDY_ALLOWED_PARENT_DOMAIN", default=BASE_DOMAIN)
+
 # django-tenants: wildcard allows *.api.logsng.tech and the root domain
 ALLOWED_HOSTS = [
     BASE_DOMAIN,
@@ -304,6 +309,14 @@ LOGGING = {
             "handlers": ["file", "console"],
             "level": "INFO",
             "propagate": True,
+        },
+        # Dedicated logger for Caddy TLS-ask decisions.
+        # Every allow/deny is written at INFO/WARNING so operators can audit
+        # which domains Caddy requested certs for and why they were rejected.
+        "inventory_logs.caddy": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }

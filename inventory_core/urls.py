@@ -12,7 +12,7 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 from inventory_core import settings
-from inventory_core.views import health_check, tls_ask
+from inventory_core.views import health_check
 
 # Define API patterns first so swagger only documents these routes.
 _tenant_api_patterns = [
@@ -38,7 +38,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health_check'),
-    path('internal/tls-ask/', tls_ask, name='tls_ask'),
+    path('internal/', include('inventory_apps.infrastructure.caddy.urls')),
 
     # Swagger
     path('', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
