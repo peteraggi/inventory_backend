@@ -77,6 +77,7 @@ SWAGGER_SETTINGS = {
 MIDDLEWARE = [
     # TenantMainMiddleware MUST be first — reads subdomain, sets schema
     "django_tenants.middleware.main.TenantMainMiddleware",
+    "inventory_core.middleware.SkipSSLRedirectForInternalCaddy",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -171,7 +172,7 @@ CORS_ORIGIN_WHITELIST = [
 
 CORS_ORIGIN_REGEX_WHITELIST = [
     r"^https://[\w\-]+\.api\.logsng\.tech$",  # all tenant subdomains
-    r"^https://[\w\-]+\.logsng\.tech$",        # any other frontend subdomains
+    r"^https://[\w\-]+\.logsng\.tech$",  # any other frontend subdomains
 ]
 
 # Explicitly list allowed request headers so browser preflights pass.
