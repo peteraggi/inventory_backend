@@ -38,7 +38,7 @@ class AccountMoveViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "partner__name", "ref", "invoice_origin"]
-    filterset_fields = ["move_type", "state", "payment_state", "partner"]
+    filterset_fields = ["move_type", "state", "payment_state", "partner", "invoice_origin"]
 
     def get_serializer_class(self):
         if self.action == "list":

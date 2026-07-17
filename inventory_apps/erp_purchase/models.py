@@ -21,6 +21,9 @@ class PurchaseOrder(models.Model):
     partner = models.ForeignKey(
         "erp_base.Partner", on_delete=models.PROTECT, related_name="purchase_orders",
     )
+    partner_ref = models.CharField(
+        max_length=255, blank=True, help_text="Vendor's own quote/order reference",
+    )
     company = models.ForeignKey(
         "erp_base.Company", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="purchase_orders",
@@ -81,6 +84,18 @@ class PurchaseOrder(models.Model):
         if self.state not in ("done",):
             self.state = "cancel"
             self.save(update_fields=["state"])
+
+    def action_send(self):
+        if self.state != "draft":
+            raise ValueError(f"Cannot send RFQ in state '{self.state}'")
+        self.state = "sent"
+        self.save(update_fields=["state"])
+
+    @property
+    def billing_status(self) -> str:
+        if self.state not in ("purchase", "done"):
+            return "nothing_to_bill"
+        return "billed" if self.invoice_count > 0 else "to_bill"
 
 
 class PurchaseOrderLine(models.Model):

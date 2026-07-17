@@ -56,7 +56,7 @@ class StockPickingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "origin"]
-    filterset_fields = ["state", "picking_type", "picking_type__code"]
+    filterset_fields = ["state", "picking_type", "picking_type__code", "origin"]
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):

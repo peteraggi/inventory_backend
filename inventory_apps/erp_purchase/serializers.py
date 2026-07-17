@@ -21,22 +21,27 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     lines = PurchaseOrderLineSerializer(many=True)
     partner_name = serializers.CharField(source="partner.name", read_only=True)
     state_display = serializers.CharField(source="get_state_display", read_only=True)
+    payment_term_name = serializers.SerializerMethodField()
+    billing_status = serializers.ReadOnlyField()
 
     class Meta:
         model = PurchaseOrder
         fields = [
-            "id", "name", "partner", "partner_name",
+            "id", "name", "partner", "partner_name", "partner_ref",
             "state", "state_display",
             "date_order", "date_planned", "date_approve",
-            "payment_term", "currency", "notes", "origin",
+            "payment_term", "payment_term_name", "currency", "notes", "origin",
             "amount_untaxed", "amount_tax", "amount_total",
-            "receipt_count", "invoice_count",
+            "receipt_count", "invoice_count", "billing_status",
             "lines", "created_at", "updated_at",
         ]
         read_only_fields = [
             "name", "state", "amount_untaxed", "amount_tax", "amount_total",
             "receipt_count", "invoice_count", "date_approve",
         ]
+
+    def get_payment_term_name(self, obj):
+        return obj.payment_term.name if obj.payment_term_id else ""
 
     def create(self, validated_data):
         lines_data = validated_data.pop("lines", [])
