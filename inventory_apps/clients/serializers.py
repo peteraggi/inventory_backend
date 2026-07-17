@@ -1,6 +1,6 @@
 import re
 from rest_framework import serializers
-from .models import Client, Domain, SubscriptionPlan
+from .models import Client, Domain, SubscriptionPlan, WaitlistSignup
 
 
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
@@ -73,3 +73,13 @@ class ClientDetailSerializer(serializers.ModelSerializer):
     def get_subdomain(self, obj):
         domain = obj.domains.filter(is_primary=True).first()
         return domain.domain if domain else None
+
+
+class WaitlistSignupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WaitlistSignup
+        fields = ['id', 'email', 'name', 'business_name', 'whatsapp', 'reason', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate_email(self, value):
+        return value.lower().strip()

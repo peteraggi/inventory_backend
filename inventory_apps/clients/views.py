@@ -9,11 +9,12 @@ from django_tenants.utils import schema_context
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from .models import Client, Domain, SubscriptionPlan
+from .models import Client, Domain, SubscriptionPlan, WaitlistSignup
 from .serializers import (
     OnboardingSerializer,
     SubscriptionPlanSerializer,
     ClientDetailSerializer,
+    WaitlistSignupSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -401,3 +402,56 @@ class OnboardingAPIView(views.APIView):
                 {"error": f"Onboarding failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class WaitlistSignupAPIView(generics.CreateAPIView):
+    """Public endpoint — captures pre-launch email signups. Re-submitting the
+    same email updates their reason/name instead of erroring."""
+
+    serializer_class = WaitlistSignupSerializer
+    permission_classes = [permissions.AllowAny]
+    queryset = WaitlistSignup.objects.all()
+
+    @swagger_auto_schema(
+        tags=["Waitlist"],
+        operation_summary="Join the waitlist",
+        operation_description="Captures an email (plus optional name/business/reason) for early access.",
+        responses={
+            201: WaitlistSignupSerializer,
+            200: WaitlistSignupSerializer,
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+        existing = WaitlistSignup.objects.filter(email=email).first()
+        if existing:
+            for field in ("name", "business_name", "whatsapp", "reason"):
+                if serializer.validated_data.get(field):
+                    setattr(existing, field, serializer.validated_data[field])
+            existing.save()
+            return Response(WaitlistSignupSerializer(existing).data, status=status.HTTP_200_OK)
+
+        signup = serializer.save()
+        return Response(WaitlistSignupSerializer(signup).data, status=status.HTTP_201_CREATED)
+
+
+class WaitlistCountAPIView(views.APIView):
+    """Public endpoint — total waitlist signups, for social-proof display."""
+
+    permission_classes = [permissions.AllowAny]
+
+    @swagger_auto_schema(
+        tags=["Waitlist"],
+        operation_summary="Get waitlist signup count",
+        responses={200: openapi.Response(
+            "Signup count",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={"count": openapi.Schema(type=openapi.TYPE_INTEGER)},
+            ),
+        )},
+    )
+    def get(self, request):
+        return Response({"count": WaitlistSignup.objects.count()})

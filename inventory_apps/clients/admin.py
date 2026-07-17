@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Client, Domain, SubscriptionPlan
+from .models import Client, Domain, SubscriptionPlan, WaitlistSignup
 
 
 @admin.register(SubscriptionPlan)
@@ -21,3 +21,11 @@ class ClientAdmin(admin.ModelAdmin):
     search_fields = ['name', 'contact_email', 'schema_name']
     readonly_fields = ['schema_name', 'created_at', 'updated_at']
     inlines = [DomainInline]
+
+
+@admin.register(WaitlistSignup)
+class WaitlistSignupAdmin(admin.ModelAdmin):
+    list_display = ['email', 'name', 'business_name', 'whatsapp', 'reason', 'created_at']
+    list_filter = ['reason']
+    search_fields = ['email', 'name', 'business_name', 'whatsapp']
+    readonly_fields = ['created_at']

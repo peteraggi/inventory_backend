@@ -18,6 +18,13 @@ from inventory_core.views import health_check
 _tenant_api_patterns = [
     path('auth/', include('inventory_apps.authentication.urls')),
     path('pos/', include('inventory_apps.pos_app.urls')),
+    # ERP module routes
+    path('erp/base/', include('inventory_apps.erp_base.urls')),
+    path('erp/inventory/', include('inventory_apps.erp_inventory.urls')),
+    path('erp/sales/', include('inventory_apps.erp_sales.urls')),
+    path('erp/purchase/', include('inventory_apps.erp_purchase.urls')),
+    path('erp/accounting/', include('inventory_apps.erp_accounting.urls')),
+    path('erp/pos/', include('inventory_apps.erp_pos.urls')),
 ]
 
 schema_view = get_schema_view(

@@ -60,6 +60,13 @@ TENANT_APPS = [
     # 'rest_framework_simplejwt.token_blacklist',
     # 'inventory_apps.authentication',
     "inventory_apps.pos_app",
+    # ERP modules (per-tenant data)
+    "inventory_apps.erp_base",
+    "inventory_apps.erp_inventory",
+    "inventory_apps.erp_sales",
+    "inventory_apps.erp_purchase",
+    "inventory_apps.erp_accounting",
+    "inventory_apps.erp_pos",
 ]
 
 # INSTALLED_APPS must be SHARED_APPS ∪ TENANT_APPS (shared first, no duplicates)

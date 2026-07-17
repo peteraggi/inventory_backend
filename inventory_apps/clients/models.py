@@ -74,3 +74,28 @@ class Client(TenantMixin):
 class Domain(DomainMixin):
     """Maps a subdomain to a Client tenant."""
     pass
+
+
+class WaitlistSignup(models.Model):
+    """Pre-launch / early-access signups captured from the public landing page."""
+
+    REASON_CHOICES = (
+        ('retailer', 'Running a retail or wholesale business'),
+        ('distributor', 'Running a distribution or logistics business'),
+        ('developer', "I'm interested in the API"),
+        ('other', 'Something else'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
+    name = models.CharField(max_length=255, blank=True)
+    business_name = models.CharField(max_length=255, blank=True)
+    whatsapp = models.CharField(max_length=50, blank=True)
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, default='other')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.email
