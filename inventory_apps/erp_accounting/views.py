@@ -25,9 +25,11 @@ class AccountAccountViewSet(viewsets.ModelViewSet):
 
 
 class AccountJournalViewSet(viewsets.ModelViewSet):
-    queryset = AccountJournal.objects.filter(active=True)
+    queryset = AccountJournal.objects.filter(active=True).select_related("default_account", "currency")
     serializer_class = AccountJournalSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    search_fields = ["name", "code"]
     filterset_fields = ["journal_type"]
 
 

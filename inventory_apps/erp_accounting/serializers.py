@@ -5,21 +5,35 @@ from inventory_apps.erp_accounting.models import (
 
 
 class AccountAccountSerializer(serializers.ModelSerializer):
+    currency_code = serializers.CharField(source="currency.code", read_only=True, default="")
+    account_type_display = serializers.CharField(source="get_account_type_display", read_only=True)
+
     class Meta:
         model = AccountAccount
         fields = [
-            "id", "code", "name", "account_type", "group",
-            "currency", "reconcile", "deprecated", "active", "note",
+            "id", "code", "name", "account_type", "account_type_display", "group",
+            "currency", "currency_code", "reconcile", "deprecated", "active", "note",
         ]
 
 
 class AccountJournalSerializer(serializers.ModelSerializer):
+    journal_type_display = serializers.CharField(source="get_journal_type_display", read_only=True)
+    currency_code = serializers.CharField(source="currency.code", read_only=True, default="")
+    default_account_name = serializers.SerializerMethodField()
+
     class Meta:
         model = AccountJournal
         fields = [
-            "id", "name", "code", "journal_type", "company", "currency",
-            "default_account", "suspense_account", "sequence_prefix", "active",
+            "id", "name", "code", "journal_type", "journal_type_display",
+            "company", "currency", "currency_code",
+            "default_account", "default_account_name",
+            "suspense_account", "sequence_prefix", "active",
         ]
+
+    def get_default_account_name(self, obj):
+        if obj.default_account_id:
+            return f"{obj.default_account.code} {obj.default_account.name}"
+        return ""
 
 
 class AccountMoveLineSerializer(serializers.ModelSerializer):

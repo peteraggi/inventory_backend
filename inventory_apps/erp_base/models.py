@@ -7,6 +7,8 @@ from decimal import Decimal
 from django.db import models
 from django.utils import timezone
 
+from inventory_apps.erp_base.storage import TenantFileSystemStorage
+
 
 class SequenceCounter(models.Model):
     """Atomic sequence counter for document numbers (SO/2026/00001, etc.)."""
@@ -63,7 +65,9 @@ class Company(models.Model):
     currency = models.ForeignKey(
         Currency, on_delete=models.PROTECT, null=True, blank=True, related_name="companies",
     )
-    logo = models.ImageField(upload_to="company/logos/", null=True, blank=True)
+    logo = models.ImageField(
+        upload_to="company/logos/", storage=TenantFileSystemStorage(), null=True, blank=True,
+    )
     street = models.CharField(max_length=255, blank=True)
     street2 = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=100, blank=True)
@@ -106,6 +110,9 @@ class Partner(models.Model):
     name = models.CharField(max_length=255, db_index=True)
     partner_type = models.CharField(
         max_length=20, choices=PARTNER_TYPE_CHOICES, default="individual",
+    )
+    image = models.ImageField(
+        upload_to="partners/", storage=TenantFileSystemStorage(), null=True, blank=True,
     )
     is_customer = models.BooleanField(default=True)
     is_vendor = models.BooleanField(default=False)
@@ -368,7 +375,9 @@ class ProductTemplate(models.Model):
     active = models.BooleanField(default=True)
     can_be_sold = models.BooleanField(default=True)
     can_be_purchased = models.BooleanField(default=True)
-    image = models.ImageField(upload_to="products/", null=True, blank=True)
+    image = models.ImageField(
+        upload_to="products/", storage=TenantFileSystemStorage(), null=True, blank=True,
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -92,7 +92,7 @@ class PartnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Partner
         fields = [
-            "id", "name", "partner_type", "is_customer", "is_vendor",
+            "id", "name", "partner_type", "image", "is_customer", "is_vendor",
             "email", "phone", "mobile",
             "street", "street2", "city", "state", "zip_code", "country",
             "tax_id", "website", "notes", "credit_limit",
@@ -141,7 +141,7 @@ class ProductTemplateListSerializer(serializers.ModelSerializer):
         model = ProductTemplate
         fields = [
             "id", "name", "internal_reference", "barcode",
-            "product_type", "category_name", "uom_name",
+            "product_type", "category_name", "uom_name", "image",
             "sale_price", "standard_price",
             "qty_on_hand", "active",
         ]
