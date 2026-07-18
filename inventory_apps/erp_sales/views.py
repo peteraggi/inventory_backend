@@ -26,6 +26,15 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
         return SaleOrderSerializer
 
     @action(detail=True, methods=["post"])
+    def send(self, request, pk=None):
+        order = self.get_object()
+        try:
+            order.action_send()
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(SaleOrderSerializer(order).data)
+
+    @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
         order = self.get_object()
         try:

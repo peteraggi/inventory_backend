@@ -88,6 +88,12 @@ class SaleOrder(models.Model):
             self.state = "cancel"
             self.save(update_fields=["state"])
 
+    def action_send(self):
+        if self.state != "draft":
+            raise ValueError(f"Cannot send quotation in state '{self.state}'")
+        self.state = "sent"
+        self.save(update_fields=["state"])
+
     @property
     def invoice_status(self):
         lines = self.lines.all()
