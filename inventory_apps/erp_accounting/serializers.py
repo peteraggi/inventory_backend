@@ -104,8 +104,9 @@ class AccountMoveListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "move_type", "move_type_display",
             "state", "payment_state",
-            "partner_name", "date", "invoice_date",
-            "amount_total", "amount_residual",
+            "partner_name", "date", "invoice_date", "invoice_date_due",
+            "invoice_origin",
+            "amount_untaxed", "amount_total", "amount_residual",
         ]
 
 
