@@ -110,7 +110,7 @@ class ProductTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "internal_reference", "barcode"]
-    filterset_fields = ["product_type", "category", "can_be_sold", "can_be_purchased"]
+    filterset_fields = ["product_type", "category", "can_be_sold", "can_be_purchased", "available_in_pos"]
 
     def get_serializer_class(self):
         if self.action == "list":

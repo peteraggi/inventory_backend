@@ -122,7 +122,7 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
             "uom", "uom_name", "purchase_uom",
             "sale_price", "standard_price",
             "taxes", "tax_names",
-            "active", "can_be_sold", "can_be_purchased",
+            "active", "can_be_sold", "can_be_purchased", "available_in_pos",
             "image", "notes",
             "qty_on_hand", "qty_available",
             "created_at", "updated_at",

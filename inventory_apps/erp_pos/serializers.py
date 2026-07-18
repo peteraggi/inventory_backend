@@ -12,12 +12,16 @@ class POSPaymentMethodSerializer(serializers.ModelSerializer):
 
 class POSConfigSerializer(serializers.ModelSerializer):
     payment_methods = POSPaymentMethodSerializer(many=True, read_only=True)
+    payment_method_ids = serializers.PrimaryKeyRelatedField(
+        source="payment_methods", many=True, write_only=True,
+        queryset=POSPaymentMethod.objects.all(), required=False,
+    )
     current_session_id = serializers.SerializerMethodField()
 
     class Meta:
         model = POSConfig
         fields = [
-            "id", "name", "journal", "payment_methods",
+            "id", "name", "journal", "payment_methods", "payment_method_ids",
             "state", "warehouse", "receipt_header", "receipt_footer",
             "active", "current_session_id",
         ]

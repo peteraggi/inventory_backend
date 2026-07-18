@@ -375,6 +375,7 @@ class ProductTemplate(models.Model):
     active = models.BooleanField(default=True)
     can_be_sold = models.BooleanField(default=True)
     can_be_purchased = models.BooleanField(default=True)
+    available_in_pos = models.BooleanField(default=True)
     image = models.ImageField(
         upload_to="products/", storage=TenantFileSystemStorage(), null=True, blank=True,
     )
