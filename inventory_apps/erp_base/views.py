@@ -9,7 +9,8 @@ from inventory_apps.erp_base.models import (
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup, ProductTemplate,
 )
 from inventory_apps.erp_base.serializers import (
-    CompanySerializer, CurrencySerializer, PartnerSerializer, PaymentTermSerializer,
+    CompanySerializer, CurrencySerializer, CurrencyRateSerializer, PartnerSerializer,
+    PaymentTermSerializer,
     UomCategorySerializer, UnitOfMeasureSerializer, ProductCategorySerializer,
     TaxSerializer, TaxGroupSerializer,
     ProductTemplateSerializer, ProductTemplateListSerializer,
@@ -23,6 +24,17 @@ class CurrencyViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "code"]
+
+    @action(detail=True, methods=["get", "post"], url_path="rates")
+    def rates(self, request, pk=None):
+        currency = self.get_object()
+        if request.method == "POST":
+            ser = CurrencyRateSerializer(data={**request.data, "currency": currency.id})
+            ser.is_valid(raise_exception=True)
+            ser.save()
+            return Response(ser.data, status=status.HTTP_201_CREATED)
+        rates = currency.rates.order_by("-rate_date")[:60]
+        return Response(CurrencyRateSerializer(rates, many=True).data)
 
 
 class CompanyViewSet(viewsets.ModelViewSet):

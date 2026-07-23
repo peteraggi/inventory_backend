@@ -9,8 +9,10 @@ class SetupService:
     @classmethod
     def seed_default_data(cls):
         """Idempotent: creates currency, company, COA stub, journals, payment terms, UOM."""
+        from django.utils import timezone
         from inventory_apps.erp_base.models import (
-            Currency, Company, UomCategory, UnitOfMeasure, TaxGroup, Tax, PaymentTerm, PaymentTermLine,
+            Currency, CurrencyRate, Company, UomCategory, UnitOfMeasure, TaxGroup, Tax,
+            PaymentTerm, PaymentTermLine,
         )
         from inventory_apps.erp_accounting.models import AccountAccount, AccountJournal
 
@@ -23,6 +25,15 @@ class SetupService:
             code="USD",
             defaults={"name": "US Dollar", "symbol": "$", "rate": Decimal("1600.000000")},
         )
+        ugx, _ = Currency.objects.get_or_create(
+            code="UGX",
+            defaults={"name": "Ugandan Shilling", "symbol": "USh", "rate": Decimal("1.000000")},
+        )
+        for currency in (ngn, usd, ugx):
+            if not currency.rates.exists():
+                CurrencyRate.objects.create(
+                    currency=currency, rate=currency.rate, rate_date=timezone.now().date(),
+                )
 
         # Company
         company, _ = Company.objects.get_or_create(

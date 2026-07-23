@@ -6,7 +6,7 @@ from .views import (
     RegisterView, LoginAPIView, LogoutAPIView,
     RequestPasswordResetEmail, VerifyResetCodeAPIView, SetNewPasswordAPIView,
     VerifyEmailAPIView, ResendVerificationCodeAPIView,
-
+    TeamListView, TeamInviteView, TeamMemberUpdateView, ChangePasswordView,
 )
 
 app_name = 'authentication'
@@ -29,4 +29,13 @@ urlpatterns = [
     path('verify-reset-code/', VerifyResetCodeAPIView.as_view(), name='verify-reset-code'),
     path('password-reset-complete/', SetNewPasswordAPIView.as_view(), name='password-reset-complete'),
 
+    # Self-service password change
+    path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+
+    # ============================================
+    # STAFF / TEAM MANAGEMENT
+    # ============================================
+    path('team/', TeamListView.as_view(), name='team-list'),
+    path('team/invite/', TeamInviteView.as_view(), name='team-invite'),
+    path('team/<uuid:pk>/', TeamMemberUpdateView.as_view(), name='team-update'),
 ]

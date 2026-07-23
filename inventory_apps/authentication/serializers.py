@@ -363,6 +363,108 @@ class SetNewPasswordSerializer(serializers.Serializer):
             raise AuthenticationFailed(f'Password reset failed: {str(e)}', 401)
 
 
+class TeamMemberSerializer(serializers.ModelSerializer):
+    """Read-only representation of a staff member for the team management screen."""
+    role_id = serializers.UUIDField(read_only=True)
+    role_name = serializers.CharField(source='role.display_name', read_only=True)
+    store_id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'name', 'email', 'phone',
+            'role_id', 'role_name', 'store_id',
+            'is_active', 'is_verified', 'created_at',
+        ]
+        read_only_fields = fields
+
+
+class TeamMemberInviteSerializer(serializers.Serializer):
+    """Serializer for an owner inviting a new staff member into their store."""
+    name = serializers.CharField()
+    email = serializers.EmailField()
+    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    role_id = serializers.UUIDField()
+
+    class Meta:
+        fields = ['name', 'email', 'phone', 'role_id']
+
+    def validate_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('Name is required and cannot be empty.')
+        return value.strip()
+
+    def validate_email(self, value):
+        email = value.lower().strip()
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError('A user with this email already exists.')
+        return email
+
+    def validate_role_id(self, value):
+        if not Role.objects.filter(id=value).exists():
+            raise serializers.ValidationError('Invalid role ID.')
+        return value
+
+    def create(self, validated_data):
+        request = self.context['request']
+        role = Role.objects.get(id=validated_data['role_id'])
+        user = User.objects.create_user(
+            name=validated_data['name'],
+            email=validated_data['email'],
+            password=None,  # unusable until the invitee sets one via change-password
+            phone=validated_data.get('phone'),
+            store=request.user.store,
+            role=role,
+        )
+        return user
+
+
+class TeamMemberUpdateSerializer(serializers.Serializer):
+    """Serializer for an owner updating a staff member's role or active status."""
+    role_id = serializers.UUIDField(required=False)
+    is_active = serializers.BooleanField(required=False)
+
+    class Meta:
+        fields = ['role_id', 'is_active']
+
+    def validate_role_id(self, value):
+        if not Role.objects.filter(id=value).exists():
+            raise serializers.ValidationError('Invalid role ID.')
+        return value
+
+    def update(self, instance, validated_data):
+        if 'role_id' in validated_data:
+            instance.role = Role.objects.get(id=validated_data['role_id'])
+        if 'is_active' in validated_data:
+            instance.is_active = validated_data['is_active']
+        instance.save(skip_validation=True)
+        return instance
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Self-service password change. old_password is required unless the account
+    doesn't have a usable password yet (newly-invited staff)."""
+    old_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    new_password = serializers.CharField(min_length=6, write_only=True)
+
+    class Meta:
+        fields = ['old_password', 'new_password']
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if user.has_usable_password():
+            old_password = attrs.get('old_password')
+            if not old_password or not user.check_password(old_password):
+                raise serializers.ValidationError({'old_password': 'Current password is incorrect.'})
+        return attrs
+
+    def save(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        return user
+
+
 class LogoutSerializer(serializers.Serializer):
     """Serializer for user logout."""
     refresh = serializers.CharField()

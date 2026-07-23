@@ -10,12 +10,16 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from .utils import Util
 from .models import User
 from .renderers import UserRenderer
+from .permissions import IsOwnerOrManager
 from .serializers import (
     RegisterSerializer, SetNewPasswordSerializer,
     ResetPasswordEmailRequestSerializer, EmailVerificationSerializer,
     LoginSerializer, LogoutSerializer, VerifyResetCodeSerializer,
-    ResendVerificationCodeSerializer,
+    ResendVerificationCodeSerializer, TeamMemberSerializer,
+    TeamMemberInviteSerializer, TeamMemberUpdateSerializer,
+    ChangePasswordSerializer,
 )
+from ..pos_app.permissions import IsOwner
 import random
 import string
 import logging
@@ -612,6 +616,152 @@ class SetNewPasswordAPIView(generics.GenericAPIView):
                 {'error': 'Password reset failed. Please try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class TeamListView(generics.ListAPIView):
+    """List staff members belonging to the current user's store."""
+    serializer_class = TeamMemberSerializer
+    permission_classes = [IsOwnerOrManager]
+
+    def get_queryset(self):
+        return User.objects.filter(store=self.request.user.store).order_by('-created_at')
+
+    @swagger_auto_schema(
+        tags=['Team'],
+        operation_summary='List staff members',
+        operation_description='Lists all users belonging to the current store. Owner/Manager only.',
+        responses={200: TeamMemberSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+class TeamInviteView(generics.GenericAPIView):
+    """Invite a new staff member into the current owner's store."""
+    serializer_class = TeamMemberInviteSerializer
+    permission_classes = [IsOwner]
+
+    @swagger_auto_schema(
+        tags=['Team'],
+        operation_summary='Invite a staff member',
+        operation_description=(
+            "Owner-only. Creates a new user scoped to the owner's store and emails them "
+            'a 6-digit verification code (same flow as self-registration). The invitee '
+            'completes setup via POST /auth/verify-email/, then sets their own password '
+            'via PATCH /auth/change-password/.'
+        ),
+        request_body=TeamMemberInviteSerializer,
+        responses={
+            201: openapi.Response('Staff member created — verification email sent', schema=TeamMemberSerializer),
+            400: openapi.Response('Validation error', schema=_ERROR_SCHEMA),
+            500: openapi.Response('Email send failed', schema=_ERROR_SCHEMA),
+        },
+    )
+    def post(self, request):
+        try:
+            serializer = self.serializer_class(data=request.data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            user = serializer.save()
+
+            verification_code = generate_token_code()
+            cache_key = f'email_verification_{user.pk}'
+            cache.set(cache_key, {
+                'code': verification_code,
+                'user_id': user.pk,
+                'attempts': 0,
+                'email': user.email,
+            }, timeout=1800)
+
+            store_name = request.user.store.name if request.user.store else 'your store'
+            email_body = (
+                f'Hello {user.name},\n\n'
+                f'You have been added to {store_name} on LOGS.\n\n'
+                f'Your email verification code is: {verification_code}\n\n'
+                'This code will expire in 30 minutes. After verifying, set your password '
+                'from the app.\n\n'
+                'Best regards,\nLOGS Team'
+            )
+            email_sent = Util.send_email({
+                'email_body': email_body,
+                'to_email': user.email,
+                'email_subject': 'You have been invited to join your team on LOGS',
+            })
+
+            if not email_sent:
+                logger.warning(f'Failed to send invite email to {user.email}')
+                cache.delete(cache_key)
+                return Response(
+                    {'error': 'Failed to send invite email. Please try again.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            return Response(TeamMemberSerializer(user).data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f'Error inviting team member: {e}', exc_info=True)
+            return Response(
+                {'error': f'Invite failed: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TeamMemberUpdateView(generics.GenericAPIView):
+    """Update a staff member's role or active status."""
+    serializer_class = TeamMemberUpdateSerializer
+    permission_classes = [IsOwner]
+
+    def get_object(self, pk):
+        return User.objects.get(pk=pk, store=self.request.user.store)
+
+    @swagger_auto_schema(
+        tags=['Team'],
+        operation_summary='Update a staff member',
+        operation_description="Owner-only. Update role and/or active status for a user in the owner's store.",
+        request_body=TeamMemberUpdateSerializer,
+        responses={
+            200: openapi.Response('Updated', schema=TeamMemberSerializer),
+            404: openapi.Response('Not found', schema=_ERROR_SCHEMA),
+        },
+    )
+    def patch(self, request, pk):
+        try:
+            user = self.get_object(pk)
+        except User.DoesNotExist:
+            return Response({'error': 'Staff member not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.serializer_class(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(TeamMemberSerializer(user).data, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    """Self-service password change for the current user."""
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        tags=['Authentication'],
+        operation_summary='Change password',
+        operation_description=(
+            'Self-service password change. If the account already has a usable password, '
+            '**old_password** must be supplied and correct. Newly-invited staff who have '
+            'not yet set a password may omit it.'
+        ),
+        request_body=ChangePasswordSerializer,
+        responses={
+            200: openapi.Response('Password updated', schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={'message': openapi.Schema(type=openapi.TYPE_STRING)},
+            )),
+            400: openapi.Response('Validation error', schema=_ERROR_SCHEMA),
+        },
+    )
+    def patch(self, request):
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'message': 'Password updated successfully'}, status=status.HTTP_200_OK)
 
 
 class LogoutAPIView(generics.GenericAPIView):

@@ -154,6 +154,62 @@ class ReportViewSet(viewsets.ViewSet):
         rows.sort(key=lambda r: r["days_overdue"], reverse=True)
         return Response(rows)
 
+    @action(detail=False, url_path="dashboard-summary")
+    def dashboard_summary(self, request):
+        from decimal import Decimal
+        from datetime import timedelta
+        from django.db.models import Sum
+        from django.utils import timezone
+        from inventory_apps.erp_pos.models import POSOrder, POSOrderLine
+        from inventory_apps.erp_sales.models import SaleOrder
+        from inventory_apps.erp_base.models import ProductTemplate
+
+        today = timezone.now().date()
+        week_ago = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+
+        pos_paid_states = ["paid", "done", "invoiced"]
+        sale_confirmed_states = ["sale", "done"]
+
+        def sales_total(date_from):
+            pos_total = POSOrder.objects.filter(
+                state__in=pos_paid_states, date_order__date__gte=date_from,
+            ).aggregate(total=Sum("amount_total"))["total"] or Decimal("0.00")
+            sale_total = SaleOrder.objects.filter(
+                state__in=sale_confirmed_states, date_order__date__gte=date_from,
+            ).aggregate(total=Sum("amount_total"))["total"] or Decimal("0.00")
+            return pos_total + sale_total
+
+        order_count = (
+            POSOrder.objects.filter(state__in=pos_paid_states, date_order__date=today).count()
+            + SaleOrder.objects.filter(state__in=sale_confirmed_states, date_order__date=today).count()
+        )
+
+        top_line = (
+            POSOrderLine.objects.filter(
+                order__state__in=pos_paid_states, order__date_order__date=today,
+            )
+            .values("product__name")
+            .annotate(total_qty=Sum("qty"))
+            .order_by("-total_qty")
+            .first()
+        )
+        top_product = top_line["product__name"] if top_line else "N/A"
+
+        low_stock_products = ProductTemplate.objects.filter(
+            product_type="storable"
+        ).prefetch_related("quants")
+        low_stock_count = sum(1 for p in low_stock_products if p.qty_on_hand <= Decimal("5"))
+
+        return Response({
+            "today_sales": sales_total(today),
+            "week_sales": sales_total(week_ago),
+            "month_sales": sales_total(month_ago),
+            "order_count": order_count,
+            "top_product": top_product,
+            "low_stock_count": low_stock_count,
+        })
+
     @action(detail=False, url_path="aged-payable")
     def aged_payable(self, request):
         from inventory_apps.erp_accounting.models import AccountMove

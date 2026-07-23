@@ -59,6 +59,25 @@ class Currency(models.Model):
         return f"{self.code} ({self.symbol})"
 
 
+class CurrencyRate(models.Model):
+    """Odoo-style time-series exchange rate: rate-by-date, not a single static number."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name="rates")
+    rate = models.DecimalField(
+        max_digits=20, decimal_places=6, default=Decimal("1.000000"),
+        help_text="Units of this currency per 1 unit of the company base currency",
+    )
+    rate_date = models.DateField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-rate_date"]
+        unique_together = [("currency", "rate_date")]
+
+    def __str__(self):
+        return f"{self.currency.code} @ {self.rate_date}: {self.rate}"
+
+
 class Company(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from inventory_apps.erp_base.models import (
-    Company, Currency, Partner, PaymentTerm, PaymentTermLine,
+    Company, Currency, CurrencyRate, Partner, PaymentTerm, PaymentTermLine,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup,
     ProductTemplate, SequenceCounter,
 )
@@ -12,13 +12,30 @@ class CurrencySerializer(serializers.ModelSerializer):
         fields = ["id", "name", "code", "symbol", "rate", "active"]
 
 
+class CurrencyRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CurrencyRate
+        fields = ["id", "currency", "rate", "rate_date", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def create(self, validated_data):
+        rate_record = super().create(validated_data)
+        currency = rate_record.currency
+        latest = currency.rates.order_by("-rate_date").first()
+        if latest and latest.pk == rate_record.pk:
+            currency.rate = rate_record.rate
+            currency.save(update_fields=["rate"])
+        return rate_record
+
+
 class CompanySerializer(serializers.ModelSerializer):
     currency_code = serializers.CharField(source="currency.code", read_only=True)
+    currency_symbol = serializers.CharField(source="currency.symbol", read_only=True)
 
     class Meta:
         model = Company
         fields = [
-            "id", "name", "currency", "currency_code", "logo",
+            "id", "name", "currency", "currency_code", "currency_symbol", "logo",
             "street", "street2", "city", "state", "zip_code", "country",
             "phone", "email", "website", "tax_id", "active",
             "created_at", "updated_at",
