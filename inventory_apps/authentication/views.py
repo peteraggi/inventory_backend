@@ -690,8 +690,12 @@ class TeamInviteView(generics.GenericAPIView):
             if not email_sent:
                 logger.warning(f'Failed to send invite email to {user.email}')
                 cache.delete(cache_key)
+                # Roll back the user record so the owner can retry with the same
+                # email once the underlying issue (email provider, etc.) is fixed —
+                # otherwise every retry fails validation with "already exists".
+                user.delete()
                 return Response(
-                    {'error': 'Failed to send invite email. Please try again.'},
+                    {'error': 'Failed to send invite email. Please check your email configuration and try again.'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
