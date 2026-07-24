@@ -21,6 +21,13 @@ logsng.tech, www.logsng.tech {
 # api.logsng.tech → Django (public schema: onboarding + plans)
 api.logsng.tech {
 	encode gzip
+	# Django only serves /media/* itself when DEBUG=True; in production Caddy
+	# serves uploaded files (product images, logos, etc.) directly from the
+	# shared media_files volume instead.
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
 	reverse_proxy inventory_backend_app:8400
 }
 
@@ -37,5 +44,11 @@ https:// {
 		on_demand
 	}
 	encode gzip
+	# Same media handling as api.logsng.tech — tenant media is schema-prefixed
+	# within the shared volume, so any subdomain can serve any tenant's files.
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
 	reverse_proxy inventory_backend_app:8400
 }
