@@ -57,9 +57,10 @@ class StockService:
         if adjustment.state != "draft":
             raise ValueError("Adjustment already validated")
 
-        inventory_loc = StockLocation.objects.filter(usage="inventory").first()
-        if not inventory_loc:
-            raise ValueError("No inventory adjustment location configured")
+        StockLocation.objects.get_or_create(
+            usage="inventory",
+            defaults={"name": "Inventory adjustment"},
+        )
 
         for line in adjustment.lines.all():
             diff = line.difference_qty
