@@ -3,10 +3,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
+from django.contrib.contenttypes.models import ContentType
 
 from inventory_apps.erp_base.models import (
     Company, Currency, Partner, PaymentTerm,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup, ProductTemplate,
+    ActivityLog,
 )
 from inventory_apps.erp_base.serializers import (
     CompanySerializer, CurrencySerializer, CurrencyRateSerializer, PartnerSerializer,
@@ -14,8 +16,24 @@ from inventory_apps.erp_base.serializers import (
     UomCategorySerializer, UnitOfMeasureSerializer, ProductCategorySerializer,
     TaxSerializer, TaxGroupSerializer,
     ProductTemplateSerializer, ProductTemplateListSerializer,
+    ActivityLogSerializer,
 )
 from inventory_apps.erp_base.services import SetupService
+
+# Fields tracked for chatter change-log entries on ProductTemplate, and their
+# display labels — mirrors Odoo's tracking=True field convention.
+PRODUCT_TRACKED_FIELDS = {
+    "name": "Name",
+    "sale_price": "Sales Price",
+    "standard_price": "Cost",
+    "product_type": "Product Type",
+    "category_id": "Category",
+    "active": "Active",
+    "can_be_sold": "Can be Sold",
+    "can_be_purchased": "Can be Purchased",
+    "available_in_pos": "Available in POS",
+    "invoice_policy": "Invoicing Policy",
+}
 
 
 class CurrencyViewSet(viewsets.ModelViewSet):
@@ -128,6 +146,62 @@ class ProductTemplateViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return ProductTemplateListSerializer
         return ProductTemplateSerializer
+
+    def _format_tracked_value(self, field, value):
+        if field == "category_id":
+            if not value:
+                return "—"
+            category = ProductCategory.objects.filter(pk=value).first()
+            return category.name if category else "—"
+        if isinstance(value, bool):
+            return "Yes" if value else "No"
+        if value in (None, ""):
+            return "—"
+        return str(value)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        before = {f: getattr(instance, f) for f in PRODUCT_TRACKED_FIELDS}
+        product = serializer.save()
+        changes = []
+        for field, label in PRODUCT_TRACKED_FIELDS.items():
+            after_value = getattr(product, field)
+            if before[field] != after_value:
+                changes.append(
+                    f"{label}: {self._format_tracked_value(field, before[field])} "
+                    f"→ {self._format_tracked_value(field, after_value)}"
+                )
+        if changes:
+            content_type = ContentType.objects.get_for_model(ProductTemplate)
+            for change in changes:
+                ActivityLog.objects.create(
+                    content_type=content_type,
+                    object_id=str(product.pk),
+                    user=self.request.user if self.request.user.is_authenticated else None,
+                    message_type="tracking",
+                    body=change,
+                )
+
+    @action(detail=True, methods=["get", "post"], url_path="activity")
+    def activity(self, request, pk=None):
+        product = self.get_object()
+        content_type = ContentType.objects.get_for_model(ProductTemplate)
+        if request.method == "POST":
+            body = (request.data.get("body") or "").strip()
+            if not body:
+                return Response({"error": "Note body is required"}, status=status.HTTP_400_BAD_REQUEST)
+            entry = ActivityLog.objects.create(
+                content_type=content_type,
+                object_id=str(product.pk),
+                user=request.user if request.user.is_authenticated else None,
+                message_type="note",
+                body=body,
+            )
+            return Response(ActivityLogSerializer(entry).data, status=status.HTTP_201_CREATED)
+        entries = ActivityLog.objects.filter(
+            content_type=content_type, object_id=str(product.pk),
+        ).select_related("user").order_by("-created_at")
+        return Response(ActivityLogSerializer(entries, many=True).data)
 
     @action(detail=False, url_path="low-stock")
     def low_stock(self, request):

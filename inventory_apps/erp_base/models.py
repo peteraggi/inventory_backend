@@ -6,6 +6,8 @@ import uuid
 from decimal import Decimal
 from django.db import models
 from django.utils import timezone
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 from inventory_apps.erp_base.storage import TenantFileSystemStorage
 
@@ -391,6 +393,15 @@ class ProductTemplate(models.Model):
         Tax, blank=True, related_name="purchase_products",
         limit_choices_to={"type_tax_use": "purchase"},
     )
+    INVOICE_POLICY_CHOICES = [
+        ("order", "Ordered quantities"),
+        ("delivery", "Delivered quantities"),
+    ]
+    invoice_policy = models.CharField(
+        max_length=10, choices=INVOICE_POLICY_CHOICES, default="order",
+        help_text="Invoice customers for the ordered or the delivered quantity.",
+    )
+    is_favorite = models.BooleanField(default=False)
     active = models.BooleanField(default=True)
     can_be_sold = models.BooleanField(default=True)
     can_be_purchased = models.BooleanField(default=True)
@@ -441,3 +452,37 @@ class ProductTemplate(models.Model):
             )
         )
         return result["total"] or Decimal("0.00")
+
+
+# ─── Activity Log (generic chatter, mirrors Odoo's mail.thread) ──────────────
+
+
+class ActivityLog(models.Model):
+    """Generic per-record activity feed: manual notes/messages plus
+    auto-logged field-change tracking, attachable to any model via a
+    (content_type, object_id) reference — same design as Odoo's mail.thread.
+    """
+    MESSAGE_TYPE_CHOICES = [
+        ("note", "Note"),
+        ("comment", "Message"),
+        ("tracking", "Field Change"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.CharField(max_length=36)
+    content_object = GenericForeignKey("content_type", "object_id")
+    user = models.ForeignKey(
+        "authentication.User", on_delete=models.SET_NULL, null=True, blank=True,
+        db_constraint=False,
+    )
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPE_CHOICES, default="note")
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["content_type", "object_id"])]
+
+    def __str__(self):
+        return f"{self.message_type}: {self.body[:40]}"

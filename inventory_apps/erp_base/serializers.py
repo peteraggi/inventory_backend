@@ -2,7 +2,7 @@ from rest_framework import serializers
 from inventory_apps.erp_base.models import (
     Company, Currency, CurrencyRate, Partner, PaymentTerm, PaymentTermLine,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup,
-    ProductTemplate, SequenceCounter,
+    ProductTemplate, SequenceCounter, ActivityLog,
 )
 
 
@@ -137,10 +137,10 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
             "description", "description_sale", "description_purchase",
             "product_type", "category", "category_name",
             "uom", "uom_name", "purchase_uom",
-            "sale_price", "standard_price",
+            "sale_price", "standard_price", "invoice_policy",
             "taxes", "tax_names",
             "active", "can_be_sold", "can_be_purchased", "available_in_pos",
-            "image", "notes",
+            "is_favorite", "image", "notes",
             "qty_on_hand", "qty_available",
             "created_at", "updated_at",
         ]
@@ -160,5 +160,14 @@ class ProductTemplateListSerializer(serializers.ModelSerializer):
             "id", "name", "internal_reference", "barcode",
             "product_type", "category_name", "uom_name", "image",
             "sale_price", "standard_price",
-            "qty_on_hand", "active",
+            "qty_on_hand", "active", "is_favorite",
         ]
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.name", read_only=True, default="")
+
+    class Meta:
+        model = ActivityLog
+        fields = ["id", "user", "user_name", "message_type", "body", "created_at"]
+        read_only_fields = ["id", "user", "user_name", "message_type", "created_at"]
