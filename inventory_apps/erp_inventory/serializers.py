@@ -75,6 +75,8 @@ class StockPickingSerializer(serializers.ModelSerializer):
     move_lines = StockMoveSerializer(many=True, read_only=True)
     picking_type_name = serializers.CharField(source="picking_type.name", read_only=True)
     partner_name = serializers.CharField(source="partner.name", read_only=True)
+    location_src_name = serializers.CharField(source="location_src.complete_name", read_only=True)
+    location_dest_name = serializers.CharField(source="location_dest.complete_name", read_only=True)
 
     class Meta:
         model = StockPicking
@@ -82,7 +84,7 @@ class StockPickingSerializer(serializers.ModelSerializer):
             "id", "name", "picking_type", "picking_type_name",
             "partner", "partner_name",
             "state", "scheduled_date", "date_done", "origin", "note",
-            "location_src", "location_dest",
+            "location_src", "location_src_name", "location_dest", "location_dest_name",
             "move_lines", "created_at",
         ]
 

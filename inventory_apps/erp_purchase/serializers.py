@@ -48,12 +48,12 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             "date_order", "date_planned", "date_approve",
             "payment_term", "payment_term_name", "currency", "notes", "origin",
             "amount_untaxed", "amount_tax", "amount_total",
-            "receipt_count", "invoice_count", "billing_status",
+            "receipt_count", "invoice_count", "billing_status", "active",
             "lines", "created_at", "updated_at",
         ]
         read_only_fields = [
             "name", "state", "amount_untaxed", "amount_tax", "amount_total",
-            "receipt_count", "invoice_count", "date_approve",
+            "receipt_count", "invoice_count", "date_approve", "active",
         ]
 
     def get_payment_term_name(self, obj):

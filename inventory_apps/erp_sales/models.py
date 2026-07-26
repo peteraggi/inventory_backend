@@ -51,6 +51,7 @@ class SaleOrder(models.Model):
     # Linked document counts (denormalised for smart buttons)
     delivery_count = models.PositiveIntegerField(default=0)
     invoice_count = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

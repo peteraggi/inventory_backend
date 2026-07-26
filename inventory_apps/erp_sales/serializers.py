@@ -33,13 +33,13 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "payment_term", "payment_term_name", "warehouse", "currency",
             "note", "client_order_ref",
             "amount_untaxed", "amount_tax", "amount_total",
-            "delivery_count", "invoice_count",
+            "delivery_count", "invoice_count", "active",
             "invoice_status", "lines",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "name", "state", "amount_untaxed", "amount_tax", "amount_total",
-            "delivery_count", "invoice_count",
+            "delivery_count", "invoice_count", "active",
         ]
 
     def get_payment_term_name(self, obj):

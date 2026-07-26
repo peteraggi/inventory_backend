@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  @page { size: A4; margin: 2cm 1.5cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #333; }
+  .header-table { width: 100%; margin-bottom: 24px; }
+  .header-table td { vertical-align: top; }
+  .company-name { font-size: 14pt; font-weight: bold; color: #2D7A71; }
+  .company-detail { font-size: 8.5pt; color: #777; line-height: 1.4; }
+  .doc-title { font-size: 18pt; font-weight: bold; color: #333; text-align: right; }
+  .doc-number { font-size: 10pt; color: #777; text-align: right; }
+  .info-table { width: 100%; margin-bottom: 20px; border-collapse: collapse; }
+  .info-table td { vertical-align: top; padding: 2px 0; font-size: 9.5pt; }
+  .info-label { color: #999; font-size: 8pt; text-transform: uppercase; }
+  .partner-name { font-weight: bold; font-size: 10.5pt; }
+  .lines-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .lines-table th {
+    background: #f5f5f5; color: #888; font-size: 8pt; text-transform: uppercase;
+    text-align: left; padding: 6px 8px; border-bottom: 1px solid #ddd;
+  }
+  .lines-table td { padding: 6px 8px; font-size: 9.5pt; border-bottom: 1px solid #eee; }
+  .text-right { text-align: right; }
+  .totals-table { width: 260px; margin-left: auto; margin-top: 14px; }
+  .totals-table td { padding: 4px 8px; font-size: 9.5pt; }
+  .totals-table .grand-total td { font-weight: bold; font-size: 12pt; color: #2D7A71; border-top: 1px solid #ccc; padding-top: 8px; }
+  .terms { margin-top: 30px; font-size: 8.5pt; color: #777; }
+  .footer { margin-top: 40px; font-size: 8pt; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 8px; }
+</style>
+</head>
+<body>
+
+  <table class="header-table">
+    <tr>
+      <td style="width: 55%;">
+        <div class="company-name">{{ company.name }}</div>
+        <div class="company-detail">
+          {% if company.street %}{{ company.street }}<br/>{% endif %}
+          {% if company.city %}{{ company.city }}{% if company.state %}, {{ company.state }}{% endif %}<br/>{% endif %}
+          {% if company.country %}{{ company.country }}<br/>{% endif %}
+          {% if company.phone %}Tel: {{ company.phone }}<br/>{% endif %}
+          {% if company.email %}{{ company.email }}<br/>{% endif %}
+          {% if company.tax_id %}TIN: {{ company.tax_id }}{% endif %}
+        </div>
+      </td>
+      <td style="width: 45%;">
+        <div class="doc-title">{{ doc_type_label }}</div>
+        <div class="doc-number">{{ doc_number }}</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="info-table">
+    <tr>
+      <td style="width: 50%;">
+        <div class="info-label">{{ partner_label }}</div>
+        <div class="partner-name">{{ partner.name }}</div>
+        {% if partner.street %}{{ partner.street }}<br/>{% endif %}
+        {% if partner.city %}{{ partner.city }}<br/>{% endif %}
+        {% if partner.email %}{{ partner.email }}<br/>{% endif %}
+        {% if partner.phone %}{{ partner.phone }}{% endif %}
+      </td>
+      <td style="width: 50%;">
+        <table style="width: 100%;">
+          <tr><td class="info-label">Order Date</td><td class="text-right">{{ order_date }}</td></tr>
+          {% if other_date %}<tr><td class="info-label">{{ other_date_label }}</td><td class="text-right">{{ other_date }}</td></tr>{% endif %}
+          {% if reference %}<tr><td class="info-label">Reference</td><td class="text-right">{{ reference }}</td></tr>{% endif %}
+          {% if payment_term %}<tr><td class="info-label">Payment Terms</td><td class="text-right">{{ payment_term }}</td></tr>{% endif %}
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table class="lines-table">
+    <thead>
+      <tr>
+        <th style="width: 44%;">Description</th>
+        <th class="text-right" style="width: 12%;">Quantity</th>
+        <th class="text-right" style="width: 14%;">Unit Price</th>
+        <th style="width: 14%;">Taxes</th>
+        <th class="text-right" style="width: 16%;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td>{{ line.description }}</td>
+        <td class="text-right">{{ line.qty }}</td>
+        <td class="text-right">{{ currency_symbol }}{{ line.unit_price }}</td>
+        <td>{{ line.taxes }}</td>
+        <td class="text-right">{{ currency_symbol }}{{ line.subtotal }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals-table">
+    <tr><td>Untaxed Amount</td><td class="text-right">{{ currency_symbol }}{{ amount_untaxed }}</td></tr>
+    <tr><td>Taxes</td><td class="text-right">{{ currency_symbol }}{{ amount_tax }}</td></tr>
+    <tr class="grand-total"><td>Total</td><td class="text-right">{{ currency_symbol }}{{ amount_total }}</td></tr>
+  </table>
+
+  {% if notes %}
+  <div class="terms">
+    <strong>Terms &amp; Conditions</strong><br/>
+    {{ notes|linebreaksbr }}
+  </div>
+  {% endif %}
+
+  <div class="footer">{{ company.name }}{% if company.phone %} — {{ company.phone }}{% endif %}{% if company.email %} — {{ company.email }}{% endif %}</div>
+
+</body>
+</html>
