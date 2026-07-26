@@ -69,7 +69,7 @@ class CurrencyRate(models.Model):
         max_digits=20, decimal_places=6, default=Decimal("1.000000"),
         help_text="Units of this currency per 1 unit of the company base currency",
     )
-    rate_date = models.DateField(default=timezone.now)
+    rate_date = models.DateField(default=timezone.localdate)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -380,7 +380,7 @@ class StockInventoryAdjustment(models.Model):
     location = models.ForeignKey(
         StockLocation, on_delete=models.PROTECT, related_name="adjustments",
     )
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
     state = models.CharField(max_length=10, choices=STATE_CHOICES, default="draft")
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

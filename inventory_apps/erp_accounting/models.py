@@ -163,7 +163,7 @@ class AccountMove(models.Model):
         "erp_base.Currency", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="account_moves",
     )
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
     invoice_date = models.DateField(null=True, blank=True)
     invoice_date_due = models.DateField(null=True, blank=True)
     invoice_origin = models.CharField(max_length=255, blank=True)
@@ -365,7 +365,7 @@ class AccountPayment(models.Model):
         related_name="payments",
     )
     amount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
-    date = models.DateField(default=timezone.now)
+    date = models.DateField(default=timezone.localdate)
     memo = models.CharField(max_length=255, blank=True)
     state = models.CharField(max_length=15, choices=STATE_CHOICES, default="draft")
 
