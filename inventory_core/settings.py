@@ -313,6 +313,15 @@ LOGGING = {
         },
     },
     "loggers": {
+        # Django's own default "django" logger routes 500s to mail_admins
+        # (console handler there is filtered to DEBUG=True only) — since no
+        # custom LOGGING here re-declares it, exceptions were going nowhere
+        # visible in production. Force them to console unconditionally.
+        "django": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
         "inventory_logs": {
             "handlers": ["file", "console"],
             "level": "INFO",
