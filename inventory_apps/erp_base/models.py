@@ -4,7 +4,7 @@ All models live in the tenant schema (per-tenant isolation via django-tenants).
 """
 import uuid
 from decimal import Decimal
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -29,8 +29,12 @@ class SequenceCounter(models.Model):
     def next_sequence(cls, prefix: str, year: int | None = None, digits: int = 5) -> str:
         yr = year or timezone.now().year
         key = f"{prefix}/{yr}"
-        counter, _ = cls.objects.select_for_update().get_or_create(prefix=key)
-        n = counter.next_value()
+        # select_for_update() requires an open transaction — callers (model
+        # .save() overrides) aren't necessarily inside one, so this must open
+        # its own rather than assume the caller did.
+        with transaction.atomic():
+            counter, _ = cls.objects.select_for_update().get_or_create(prefix=key)
+            n = counter.next_value()
         return f"{prefix}/{yr}/{str(n).zfill(digits)}"
 
     def __str__(self):
