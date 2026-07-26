@@ -159,7 +159,7 @@ class ProductTemplateListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "internal_reference", "barcode",
             "product_type", "category_name", "uom_name", "image",
-            "sale_price", "standard_price",
+            "sale_price", "standard_price", "taxes", "supplier_taxes",
             "qty_on_hand", "active", "is_favorite",
         ]
 

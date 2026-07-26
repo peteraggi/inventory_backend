@@ -1,20 +1,36 @@
 from rest_framework import serializers
+from inventory_apps.erp_base.models import Tax
 from inventory_apps.erp_purchase.models import PurchaseOrder, PurchaseOrderLine
 
 
 class PurchaseOrderLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    taxes = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Tax.objects.filter(active=True),
+    )
+    tax_names = serializers.SerializerMethodField()
 
     class Meta:
         model = PurchaseOrderLine
         fields = [
             "id", "product", "product_name", "description",
             "product_qty", "qty_received", "qty_billed",
-            "price_unit",
+            "price_unit", "taxes", "tax_names",
             "price_subtotal", "tax_amount", "price_total",
             "date_planned", "sequence",
         ]
         read_only_fields = ["price_subtotal", "tax_amount", "price_total", "qty_received", "qty_billed"]
+
+    def get_tax_names(self, obj):
+        return [t.name for t in obj.taxes.all()]
+
+
+def _create_line(order, line_data):
+    taxes = line_data.pop("taxes", [])
+    line = PurchaseOrderLine.objects.create(order=order, **line_data)
+    line.taxes.set(taxes)
+    line.compute_amount()
+    return line
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
@@ -47,7 +63,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         lines_data = validated_data.pop("lines", [])
         order = PurchaseOrder.objects.create(**validated_data)
         for line_data in lines_data:
-            PurchaseOrderLine.objects.create(order=order, **line_data)
+            _create_line(order, line_data)
         order.compute_totals()
         return order
 
@@ -59,7 +75,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if lines_data is not None:
             instance.lines.all().delete()
             for line_data in lines_data:
-                PurchaseOrderLine.objects.create(order=instance, **line_data)
+                _create_line(instance, line_data)
             instance.compute_totals()
         return instance
 

@@ -115,6 +115,9 @@ class PurchaseOrderLine(models.Model):
         max_digits=18, decimal_places=4, default=Decimal("0.0000"),
     )
     price_unit = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("0.0000"))
+    taxes = models.ManyToManyField(
+        "erp_base.Tax", blank=True, related_name="purchase_order_lines",
+    )
     price_subtotal = models.DecimalField(
         max_digits=18, decimal_places=2, default=Decimal("0.00"), editable=False,
     )
@@ -132,13 +135,20 @@ class PurchaseOrderLine(models.Model):
 
     def save(self, *args, **kwargs):
         self.price_subtotal = (self.price_unit * self.product_qty).quantize(Decimal("0.01"))
+        super().save(*args, **kwargs)
+
+    def compute_amount(self):
+        """Recompute tax_amount/price_total from the (already-saved) taxes M2M.
+
+        Must be called after .taxes.set(...), since the line needs a PK
+        before the M2M relation can be queried.
+        """
         tax_total = Decimal("0.00")
-        if self.product_id:
-            for tax in self.product.supplier_taxes.filter(active=True):
-                tax_total += tax.compute_amount(self.price_subtotal)
+        for tax in self.taxes.all():
+            tax_total += tax.compute_amount(self.price_subtotal)
         self.tax_amount = tax_total
         self.price_total = self.price_subtotal + tax_total
-        super().save(*args, **kwargs)
+        models.Model.save(self, update_fields=["tax_amount", "price_total"])
 
     def __str__(self):
         return f"{self.product.name} x {self.product_qty}"
