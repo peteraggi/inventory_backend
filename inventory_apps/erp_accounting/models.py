@@ -284,6 +284,9 @@ class AccountMoveLine(models.Model):
     quantity = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("1.0000"))
     price_unit = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("0.0000"))
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    taxes = models.ManyToManyField(
+        "erp_base.Tax", blank=True, related_name="account_move_lines",
+    )
     price_subtotal = models.DecimalField(
         max_digits=18, decimal_places=2, default=Decimal("0.00"), editable=False,
     )
@@ -316,17 +319,28 @@ class AccountMoveLine(models.Model):
             base = self.price_unit * self.quantity
             disc = base * (self.discount / Decimal("100"))
             self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
-            tax_total = Decimal("0.00")
-            if self.move.move_type in ("out_invoice", "out_refund"):
-                for tax in self.product.taxes.filter(active=True):
-                    tax_total += tax.compute_amount(self.price_subtotal)
-            else:
-                for tax in self.product.supplier_taxes.filter(active=True):
-                    tax_total += tax.compute_amount(self.price_subtotal)
-            self.tax_amount = tax_total
-            self.price_total = self.price_subtotal + tax_total
         self.balance = self.debit - self.credit
         super().save(*args, **kwargs)
+
+    def compute_amount(self):
+        """Recompute tax_amount/price_total from the `taxes` M2M (must be
+        called after .taxes.set(...), since the line needs a PK first).
+        Falls back to the product's own default taxes when the line has none
+        explicitly set — e.g. bills/invoices created directly rather than
+        from a purchase/sale order line that already had taxes chosen.
+        """
+        if not self.product_id or self.exclude_from_invoice_tab:
+            return
+        taxes = list(self.taxes.all())
+        if not taxes and self.product_id:
+            if self.move.move_type in ("out_invoice", "out_refund"):
+                taxes = list(self.product.taxes.filter(active=True))
+            else:
+                taxes = list(self.product.supplier_taxes.filter(active=True))
+        tax_total = sum((t.compute_amount(self.price_subtotal) for t in taxes), Decimal("0.00"))
+        self.tax_amount = tax_total
+        self.price_total = self.price_subtotal + tax_total
+        models.Model.save(self, update_fields=["tax_amount", "price_total"])
 
     def __str__(self):
         return f"{self.account.code} Dr:{self.debit} Cr:{self.credit}"

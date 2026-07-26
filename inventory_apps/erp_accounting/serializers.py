@@ -2,6 +2,7 @@ from rest_framework import serializers
 from inventory_apps.erp_accounting.models import (
     AccountAccount, AccountJournal, AccountMove, AccountMoveLine, AccountPayment,
 )
+from inventory_apps.erp_base.models import Tax
 
 
 class AccountAccountSerializer(serializers.ModelSerializer):
@@ -40,6 +41,10 @@ class AccountMoveLineSerializer(serializers.ModelSerializer):
     account_name = serializers.CharField(source="account.name", read_only=True)
     account_code = serializers.CharField(source="account.code", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
+    taxes = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Tax.objects.filter(active=True),
+    )
+    tax_names = serializers.SerializerMethodField()
 
     class Meta:
         model = AccountMoveLine
@@ -48,7 +53,7 @@ class AccountMoveLineSerializer(serializers.ModelSerializer):
             "account", "account_code", "account_name",
             "partner", "name",
             "product", "product_name",
-            "quantity", "price_unit", "discount",
+            "quantity", "price_unit", "discount", "taxes", "tax_names",
             "price_subtotal", "tax_amount", "price_total",
             "debit", "credit", "balance",
             "amount_residual", "reconciled",
@@ -56,6 +61,9 @@ class AccountMoveLineSerializer(serializers.ModelSerializer):
             "date_maturity",
         ]
         read_only_fields = ["price_subtotal", "tax_amount", "price_total", "balance"]
+
+    def get_tax_names(self, obj):
+        return [t.name for t in obj.taxes.all()]
 
 
 class AccountMoveSerializer(serializers.ModelSerializer):
@@ -86,11 +94,19 @@ class AccountMoveSerializer(serializers.ModelSerializer):
             "amount_residual", "amount_paid",
         ]
 
+    def _create_line(self, move, line_data):
+        taxes = line_data.pop("taxes", [])
+        line = AccountMoveLine.objects.create(move=move, **line_data)
+        if taxes:
+            line.taxes.set(taxes)
+        line.compute_amount()
+        return line
+
     def create(self, validated_data):
         lines_data = validated_data.pop("lines", [])
         move = AccountMove.objects.create(**validated_data)
         for line_data in lines_data:
-            AccountMoveLine.objects.create(move=move, **line_data)
+            self._create_line(move, line_data)
         move.compute_totals()
         return move
 
@@ -104,7 +120,7 @@ class AccountMoveSerializer(serializers.ModelSerializer):
         if lines_data is not None:
             instance.lines.all().delete()
             for line_data in lines_data:
-                AccountMoveLine.objects.create(move=instance, **line_data)
+                self._create_line(instance, line_data)
             instance.compute_totals()
         return instance
 

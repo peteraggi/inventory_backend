@@ -51,7 +51,7 @@ class PurchaseService:
         ).first() or AccountAccount.objects.filter(account_type="expense", active=True).first()
 
         for line in purchase_order.lines.all():
-            AccountMoveLine.objects.create(
+            move_line = AccountMoveLine.objects.create(
                 move=move,
                 product=line.product,
                 account=expense_account or ap_account,
@@ -59,6 +59,8 @@ class PurchaseService:
                 quantity=line.product_qty,
                 price_unit=line.price_unit,
             )
+            move_line.taxes.set(line.taxes.all())
+            move_line.compute_amount()
             line.qty_billed = line.product_qty
             line.save(update_fields=["qty_billed"])
 

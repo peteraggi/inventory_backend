@@ -59,7 +59,7 @@ class SalesService:
         ).first()
 
         for line in sale_order.lines.all():
-            AccountMoveLine.objects.create(
+            move_line = AccountMoveLine.objects.create(
                 move=move,
                 product=line.product,
                 account=income_account or ar_account,
@@ -68,6 +68,7 @@ class SalesService:
                 price_unit=line.price_unit,
                 discount=line.discount,
             )
+            move_line.compute_amount()
             line.qty_invoiced = line.product_uom_qty
             line.save(update_fields=["qty_invoiced"])
 

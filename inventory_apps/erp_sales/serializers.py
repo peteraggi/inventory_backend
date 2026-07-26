@@ -4,17 +4,23 @@ from inventory_apps.erp_sales.models import SaleOrder, SaleOrderLine
 
 class SaleOrderLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    tax_names = serializers.SerializerMethodField()
 
     class Meta:
         model = SaleOrderLine
         fields = [
             "id", "product", "product_name", "description",
             "product_uom_qty", "qty_delivered", "qty_invoiced",
-            "price_unit", "discount",
+            "price_unit", "discount", "tax_names",
             "price_subtotal", "tax_amount", "price_total",
             "sequence",
         ]
         read_only_fields = ["price_subtotal", "tax_amount", "price_total", "qty_delivered", "qty_invoiced"]
+
+    def get_tax_names(self, obj):
+        if not obj.product_id:
+            return []
+        return [t.name for t in obj.product.taxes.filter(active=True)]
 
 
 class SaleOrderSerializer(serializers.ModelSerializer):
