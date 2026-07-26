@@ -97,17 +97,62 @@ class StockService:
         ).order_by("product_name")
 
     @classmethod
+    def ensure_picking_type(cls, code):
+        """Get the warehouse's picking type for `code`, self-healing it (and
+        the supplier/customer virtual location it needs) into existence if
+        missing — e.g. because those virtual locations didn't exist yet when
+        the warehouse was first created, so _create_default_picking_types()
+        silently skipped it.
+        """
+        from inventory_apps.erp_inventory.models import StockPickingType, StockLocation, Warehouse
+
+        picking_type = StockPickingType.objects.filter(code=code).first()
+        if picking_type:
+            return picking_type
+
+        warehouse = Warehouse.objects.filter(active=True).first()
+        if not warehouse:
+            raise ValueError("No warehouse configured")
+        stock_loc = warehouse.lot_stock_location or StockLocation.objects.filter(
+            warehouse=warehouse, name="Stock",
+        ).first()
+        if not stock_loc:
+            raise ValueError(f"Warehouse '{warehouse.name}' is missing a Stock location")
+
+        if code == "incoming":
+            partner_loc, _ = StockLocation.objects.get_or_create(
+                usage="supplier", defaults={"name": "Vendors"},
+            )
+            return StockPickingType.objects.create(
+                name="Receipts", code="incoming", warehouse=warehouse,
+                default_location_src=partner_loc, default_location_dest=stock_loc,
+                sequence_prefix=f"{warehouse.short_name}/IN/",
+            )
+        if code == "outgoing":
+            customer_loc, _ = StockLocation.objects.get_or_create(
+                usage="customer", defaults={"name": "Customers"},
+            )
+            return StockPickingType.objects.create(
+                name="Delivery Orders", code="outgoing", warehouse=warehouse,
+                default_location_src=stock_loc, default_location_dest=customer_loc,
+                sequence_prefix=f"{warehouse.short_name}/OUT/",
+            )
+        if code == "internal":
+            return StockPickingType.objects.create(
+                name="Internal Transfers", code="internal", warehouse=warehouse,
+                default_location_src=stock_loc, default_location_dest=stock_loc,
+                sequence_prefix=f"{warehouse.short_name}/INT/",
+            )
+        raise ValueError(f"Unknown picking type code '{code}'")
+
+    @classmethod
     @transaction.atomic
     def create_receipt_from_po(cls, purchase_order):
         """Create a stock picking (receipt) from a confirmed purchase order."""
-        from inventory_apps.erp_inventory.models import (
-            StockPickingType, StockPicking, StockMove, StockLocation,
-        )
-        picking_type = StockPickingType.objects.filter(code="incoming").first()
-        if not picking_type:
-            raise ValueError("No incoming picking type configured")
+        from inventory_apps.erp_inventory.models import StockPicking, StockMove
 
-        partner_loc = StockLocation.objects.filter(usage="supplier").first()
+        picking_type = cls.ensure_picking_type("incoming")
+        partner_loc = picking_type.default_location_src
         dest_loc = picking_type.default_location_dest
 
         picking = StockPicking.objects.create(
@@ -142,14 +187,10 @@ class StockService:
     @transaction.atomic
     def create_delivery_from_so(cls, sale_order):
         """Create a stock picking (delivery) from a confirmed sale order."""
-        from inventory_apps.erp_inventory.models import (
-            StockPickingType, StockPicking, StockMove, StockLocation,
-        )
-        picking_type = StockPickingType.objects.filter(code="outgoing").first()
-        if not picking_type:
-            raise ValueError("No outgoing picking type configured")
+        from inventory_apps.erp_inventory.models import StockPicking, StockMove
 
-        customer_loc = StockLocation.objects.filter(usage="customer").first()
+        picking_type = cls.ensure_picking_type("outgoing")
+        customer_loc = picking_type.default_location_dest
         src_loc = picking_type.default_location_src
 
         picking = StockPicking.objects.create(

@@ -14,7 +14,7 @@ class POSService:
         """Validate payment, update stock, optionally create invoice."""
         from inventory_apps.erp_pos.models import POSOrder, POSPayment
         from inventory_apps.erp_inventory.services import StockService
-        from inventory_apps.erp_inventory.models import StockLocation, StockPickingType, StockPicking, StockMove
+        from inventory_apps.erp_inventory.models import StockPicking, StockMove
 
         if pos_order.state != "draft":
             raise ValueError("Order is not in draft state")
@@ -28,36 +28,34 @@ class POSService:
             )
 
         # Reduce stock for storable products
-        picking_type = StockPickingType.objects.filter(code="outgoing").first()
-        if picking_type:
-            storable_lines = [
-                l for l in pos_order.lines.all()
-                if l.product.product_type == "storable"
-            ]
-            if storable_lines:
-                customer_loc = StockLocation.objects.filter(usage="customer").first()
-                src_loc = picking_type.default_location_src
-                if src_loc and customer_loc:
-                    picking = StockPicking.objects.create(
-                        picking_type=picking_type,
-                        partner=pos_order.partner,
-                        origin=pos_order.name,
-                        location_src=src_loc,
-                        location_dest=customer_loc,
-                        state="confirmed",
-                    )
-                    for line in storable_lines:
-                        StockMove.objects.create(
-                            picking=picking,
-                            product=line.product,
-                            product_uom_qty=line.qty,
-                            quantity_done=line.qty,
-                            location_src=src_loc,
-                            location_dest=customer_loc,
-                            origin=pos_order.name,
-                            state="confirmed",
-                        )
-                    StockService.validate_picking(picking)
+        storable_lines = [
+            l for l in pos_order.lines.all()
+            if l.product.product_type == "storable"
+        ]
+        if storable_lines:
+            picking_type = StockService.ensure_picking_type("outgoing")
+            customer_loc = picking_type.default_location_dest
+            src_loc = picking_type.default_location_src
+            picking = StockPicking.objects.create(
+                picking_type=picking_type,
+                partner=pos_order.partner,
+                origin=pos_order.name,
+                location_src=src_loc,
+                location_dest=customer_loc,
+                state="confirmed",
+            )
+            for line in storable_lines:
+                StockMove.objects.create(
+                    picking=picking,
+                    product=line.product,
+                    product_uom_qty=line.qty,
+                    quantity_done=line.qty,
+                    location_src=src_loc,
+                    location_dest=customer_loc,
+                    origin=pos_order.name,
+                    state="confirmed",
+                )
+            StockService.validate_picking(picking)
 
         pos_order.state = "paid"
         pos_order.save(update_fields=["state"])

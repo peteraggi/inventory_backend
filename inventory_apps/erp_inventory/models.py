@@ -56,8 +56,15 @@ class Warehouse(models.Model):
         )
 
     def _create_default_picking_types(self):
-        partner_loc = StockLocation.objects.filter(usage="supplier").first()
-        customer_loc = StockLocation.objects.filter(usage="customer").first()
+        # Virtual locations shared across all warehouses — get_or_create since
+        # nothing else seeds these; without them Receipts/Delivery Orders
+        # picking types below would silently never get created.
+        partner_loc, _ = StockLocation.objects.get_or_create(
+            usage="supplier", defaults={"name": "Vendors"},
+        )
+        customer_loc, _ = StockLocation.objects.get_or_create(
+            usage="customer", defaults={"name": "Customers"},
+        )
         stock_loc = getattr(self, "lot_stock_location", None) or StockLocation.objects.filter(
             warehouse=self, name="Stock"
         ).first()
