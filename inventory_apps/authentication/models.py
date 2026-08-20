@@ -4,6 +4,7 @@ from django.db import models
 from django.contrib.auth.models import (
     AbstractBaseUser, BaseUserManager, PermissionsMixin)
 from rest_framework_simplejwt.tokens import RefreshToken
+from .storage import TenantFileSystemStorage
 import uuid
 import re
 
@@ -95,6 +96,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=255, unique=True, db_index=True)
     phone = models.CharField(max_length=255, blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
+    signature = models.ImageField(
+        upload_to="signatures/", storage=TenantFileSystemStorage(), null=True, blank=True,
+        help_text="Drawn or uploaded signature image, used on documents (quotations, invoices, etc.)",
+    )
     # Store and Role are in pos_app (same tenant schema); string refs avoid circular imports
     store = models.ForeignKey(
         'pos_app.Store',

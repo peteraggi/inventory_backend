@@ -7,6 +7,7 @@ from .views import (
     RequestPasswordResetEmail, VerifyResetCodeAPIView, SetNewPasswordAPIView,
     VerifyEmailAPIView, ResendVerificationCodeAPIView,
     TeamListView, TeamInviteView, TeamMemberUpdateView, ChangePasswordView,
+    MeView,
 )
 
 app_name = 'authentication'
@@ -31,6 +32,9 @@ urlpatterns = [
 
     # Self-service password change
     path('change-password/', ChangePasswordView.as_view(), name='change-password'),
+
+    # Self-service profile (name, phone, bio, signature)
+    path('me/', MeView.as_view(), name='me'),
 
     # ============================================
     # STAFF / TEAM MANAGEMENT

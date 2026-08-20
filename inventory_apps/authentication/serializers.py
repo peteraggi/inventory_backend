@@ -441,6 +441,20 @@ class TeamMemberUpdateSerializer(serializers.Serializer):
         return instance
 
 
+class MeSerializer(serializers.ModelSerializer):
+    """Self-service profile for the logged-in user, including their signature."""
+    role_name = serializers.CharField(source='role.display_name', read_only=True)
+    store_name = serializers.CharField(source='store.name', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'name', 'email', 'phone', 'bio', 'signature',
+            'role_name', 'store_name', 'created_at',
+        ]
+        read_only_fields = ['id', 'email', 'role_name', 'store_name', 'created_at']
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     """Self-service password change. old_password is required unless the account
     doesn't have a usable password yet (newly-invited staff)."""

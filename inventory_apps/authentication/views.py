@@ -17,7 +17,7 @@ from .serializers import (
     LoginSerializer, LogoutSerializer, VerifyResetCodeSerializer,
     ResendVerificationCodeSerializer, TeamMemberSerializer,
     TeamMemberInviteSerializer, TeamMemberUpdateSerializer,
-    ChangePasswordSerializer,
+    ChangePasswordSerializer, MeSerializer,
 )
 from ..pos_app.permissions import IsOwner
 import random
@@ -737,6 +737,28 @@ class TeamMemberUpdateView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(TeamMemberSerializer(user).data, status=status.HTTP_200_OK)
+
+
+class MeView(generics.RetrieveUpdateAPIView):
+    """Self-service profile for the logged-in user — get/update name, phone,
+    bio, and signature (drawn or uploaded image, used on documents)."""
+    serializer_class = MeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    @swagger_auto_schema(tags=['Authentication'], operation_summary='Get my profile')
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        tags=['Authentication'],
+        operation_summary='Update my profile',
+        operation_description='Partial update of name, phone, bio, and/or signature. Send signature as multipart/form-data to upload an image.',
+    )
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
 
 
 class ChangePasswordView(generics.GenericAPIView):
