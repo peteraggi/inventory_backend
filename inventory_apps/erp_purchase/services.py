@@ -49,12 +49,17 @@ class PurchaseService:
         expense_account = AccountAccount.objects.filter(
             account_type="expense_direct_cost", active=True
         ).first() or AccountAccount.objects.filter(account_type="expense", active=True).first()
+        line_account = expense_account or ap_account
+        if not line_account:
+            raise ValueError(
+                "No expense or payable account configured. Please set up your chart of accounts."
+            )
 
         for line in purchase_order.lines.all():
             move_line = AccountMoveLine.objects.create(
                 move=move,
                 product=line.product,
-                account=expense_account or ap_account,
+                account=line_account,
                 name=line.description or line.product.name,
                 quantity=line.product_qty,
                 price_unit=line.price_unit,

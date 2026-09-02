@@ -57,12 +57,17 @@ class SalesService:
         income_account = AccountAccount.objects.filter(
             account_type="income", active=True
         ).first()
+        line_account = income_account or ar_account
+        if not line_account:
+            raise ValueError(
+                "No income or receivable account configured. Please set up your chart of accounts."
+            )
 
         for line in sale_order.lines.all():
             move_line = AccountMoveLine.objects.create(
                 move=move,
                 product=line.product,
-                account=income_account or ar_account,
+                account=line_account,
                 name=line.description or line.product.name,
                 quantity=line.product_uom_qty,
                 price_unit=line.price_unit,
