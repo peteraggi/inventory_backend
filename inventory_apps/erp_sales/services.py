@@ -47,7 +47,6 @@ class SalesService:
             invoice_origin=sale_order.name,
             sale_order=sale_order,
             currency=sale_order.currency,
-            payment_term=sale_order.payment_term if hasattr(sale_order, "payment_term") else None,
         )
         # Find the AR account
         from inventory_apps.erp_accounting.models import AccountAccount
