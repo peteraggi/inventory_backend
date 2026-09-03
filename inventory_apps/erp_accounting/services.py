@@ -52,53 +52,96 @@ class AccountingService:
     @classmethod
     def _generate_accounting_lines(cls, move):
         """
-        For invoices, create the counterpart receivable/payable line automatically.
-        Invoice tab lines (exclude_from_invoice_tab=False) already exist.
-        We add one counterpart line for the total amount.
+        Turn an invoice/bill into a genuine balanced double-entry journal entry.
+
+        Previously this only ever created ONE counterpart (AR/AP) line with real
+        debit/credit — the income/expense lines from the invoice tab kept
+        debit=credit=0 forever (nothing else ever set them), and tax was never
+        posted to a tax account at all. That meant the counterpart line didn't
+        actually balance against anything, and the General Ledger/Trial Balance
+        never reflected real invoice revenue or expense. Now:
+          - each invoice-tab (product) line gets its debit/credit set from its
+            own price_subtotal (income lines credit, expense lines debit;
+            reversed for credit notes),
+          - one aggregated tax line posts the total tax to a payable (sales)
+            or receivable (purchase) tax account, if any tax was charged,
+          - one counterpart line carries the tax-inclusive total on the
+            receivable/payable account.
+        Debits and credits are constructed to sum equal by design — see the
+        sign table in the comments below.
         """
         from inventory_apps.erp_accounting.models import AccountAccount, AccountMoveLine
 
-        if move.move_type in ("out_invoice", "out_refund"):
-            account_type = "asset_receivable"
-            sign = 1 if move.move_type == "out_invoice" else -1
-        else:
-            account_type = "liability_payable"
-            sign = 1 if move.move_type == "in_invoice" else -1
+        is_customer_side = move.move_type in ("out_invoice", "out_refund")
+        is_reversal = move.move_type in ("out_refund", "in_refund")
 
-        counterpart_account = AccountAccount.objects.filter(
-            account_type=account_type, active=True
-        ).first()
-        if not counterpart_account:
-            return
+        # 1. Populate debit/credit on the existing invoice-tab lines.
+        #    Customer invoice line (not a reversal): credit = subtotal (revenue).
+        #    Vendor bill line (not a reversal): debit = subtotal (expense).
+        #    A credit note reverses whichever side its own type would normally be.
+        invoice_lines = list(move.lines.filter(exclude_from_invoice_tab=False))
+        subtotal = Decimal("0.00")
+        tax_total = Decimal("0.00")
+        for line in invoice_lines:
+            subtotal += line.price_subtotal
+            tax_total += line.tax_amount
+            if is_customer_side != is_reversal:
+                debit, credit = Decimal("0.00"), line.price_subtotal
+            else:
+                debit, credit = line.price_subtotal, Decimal("0.00")
+            AccountMoveLine.objects.filter(pk=line.pk).update(
+                debit=debit, credit=credit, balance=debit - credit,
+            )
 
-        # Delete any existing counterpart line so we don't duplicate
+        # Delete any previously-generated counterpart/tax lines so re-posting
+        # (e.g. after editing) doesn't duplicate them.
         move.lines.filter(exclude_from_invoice_tab=True).delete()
 
-        total = sum(
-            l.price_subtotal + l.tax_amount
-            for l in move.lines.filter(exclude_from_invoice_tab=False)
-        ) or Decimal("0.00")
-
+        total = subtotal + tax_total
         if total == Decimal("0.00"):
             return
 
-        if move.move_type in ("out_invoice", "in_refund"):
-            debit = total * sign if sign > 0 else Decimal("0.00")
-            credit = abs(total * sign) if sign < 0 else Decimal("0.00")
-        else:
-            debit = Decimal("0.00")
-            credit = total
+        counterpart_type = "asset_receivable" if is_customer_side else "liability_payable"
+        counterpart_account = AccountAccount.objects.filter(
+            account_type=counterpart_type, active=True
+        ).first()
+        if counterpart_account:
+            if is_customer_side != is_reversal:
+                cp_debit, cp_credit = total, Decimal("0.00")
+            else:
+                cp_debit, cp_credit = Decimal("0.00"), total
+            AccountMoveLine.objects.create(
+                move=move,
+                account=counterpart_account,
+                partner=move.partner,
+                name=f"Counterpart: {move.partner.name if move.partner else ''}",
+                debit=cp_debit,
+                credit=cp_credit,
+                exclude_from_invoice_tab=True,
+                date_maturity=move.invoice_date_due,
+            )
 
-        AccountMoveLine.objects.create(
-            move=move,
-            account=counterpart_account,
-            partner=move.partner,
-            name=f"Counterpart: {move.partner.name if move.partner else ''}",
-            debit=debit if move.move_type in ("out_invoice",) else Decimal("0.00"),
-            credit=credit if move.move_type in ("out_invoice",) else total,
-            exclude_from_invoice_tab=True,
-            date_maturity=move.invoice_date_due,
-        )
+        # 2. Aggregated tax line: VAT Payable for sales, input VAT (receivable)
+        #    for purchases — best-effort lookup by account type, since we don't
+        #    track a dedicated "tax account" per Tax record yet.
+        if tax_total != Decimal("0.00"):
+            tax_account_type = "liability_current" if is_customer_side else "asset_current"
+            tax_account = AccountAccount.objects.filter(
+                account_type=tax_account_type, active=True
+            ).first()
+            if tax_account:
+                if is_customer_side == is_reversal:
+                    tax_debit, tax_credit = tax_total, Decimal("0.00")
+                else:
+                    tax_debit, tax_credit = Decimal("0.00"), tax_total
+                AccountMoveLine.objects.create(
+                    move=move,
+                    account=tax_account,
+                    name="Tax",
+                    debit=tax_debit,
+                    credit=tax_credit,
+                    exclude_from_invoice_tab=True,
+                )
 
     @classmethod
     @transaction.atomic
