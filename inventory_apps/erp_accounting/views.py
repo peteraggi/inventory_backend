@@ -56,6 +56,15 @@ class AccountMoveViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(AccountMoveSerializer(move).data)
 
+    @action(detail=True, methods=["post"], url_path="recompute-journal-items")
+    def recompute_journal_items(self, request, pk=None):
+        move = self.get_object()
+        try:
+            AccountingService.recompute_journal_items(move)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(AccountMoveSerializer(move).data)
+
     @action(detail=True, methods=["post"], url_path="register-payment")
     def register_payment(self, request, pk=None):
         move = self.get_object()
