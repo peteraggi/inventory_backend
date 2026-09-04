@@ -26,6 +26,7 @@ class SaleOrderLineSerializer(serializers.ModelSerializer):
 class SaleOrderSerializer(serializers.ModelSerializer):
     lines = SaleOrderLineSerializer(many=True)
     partner_name = serializers.CharField(source="partner.name", read_only=True)
+    partner_address_lines = serializers.SerializerMethodField()
     state_display = serializers.CharField(source="get_state_display", read_only=True)
     invoice_status = serializers.CharField(read_only=True)
     payment_term_name = serializers.SerializerMethodField()
@@ -34,7 +35,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = SaleOrder
         fields = [
-            "id", "name", "partner", "partner_name",
+            "id", "name", "partner", "partner_name", "partner_address_lines",
             "state", "state_display",
             "date_order", "validity_date",
             "payment_term", "payment_term_name", "warehouse", "currency",
@@ -52,6 +53,9 @@ class SaleOrderSerializer(serializers.ModelSerializer):
 
     def get_payment_term_name(self, obj):
         return obj.payment_term.name if obj.payment_term_id else ""
+
+    def get_partner_address_lines(self, obj):
+        return obj.partner.address_lines if obj.partner_id else []
 
     def create(self, validated_data):
         lines_data = validated_data.pop("lines", [])

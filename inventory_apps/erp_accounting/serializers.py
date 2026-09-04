@@ -69,6 +69,7 @@ class AccountMoveLineSerializer(serializers.ModelSerializer):
 class AccountMoveSerializer(serializers.ModelSerializer):
     lines = AccountMoveLineSerializer(many=True)
     partner_name = serializers.CharField(source="partner.name", read_only=True)
+    partner_address_lines = serializers.SerializerMethodField()
     journal_name = serializers.CharField(source="journal.name", read_only=True)
     move_type_display = serializers.CharField(source="get_move_type_display", read_only=True)
     state_display = serializers.CharField(source="get_state_display", read_only=True)
@@ -80,7 +81,7 @@ class AccountMoveSerializer(serializers.ModelSerializer):
             "move_type", "move_type_display",
             "state", "state_display", "payment_state",
             "journal", "journal_name",
-            "partner", "partner_name",
+            "partner", "partner_name", "partner_address_lines",
             "currency", "date", "invoice_date", "invoice_date_due",
             "invoice_origin", "narration",
             "amount_untaxed", "amount_tax", "amount_total",
@@ -93,6 +94,9 @@ class AccountMoveSerializer(serializers.ModelSerializer):
             "amount_untaxed", "amount_tax", "amount_total",
             "amount_residual", "amount_paid",
         ]
+
+    def get_partner_address_lines(self, obj):
+        return obj.partner.address_lines if obj.partner_id else []
 
     def _create_line(self, move, line_data):
         taxes = line_data.pop("taxes", [])

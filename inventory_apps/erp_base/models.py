@@ -104,6 +104,17 @@ class Company(models.Model):
     website = models.URLField(blank=True)
     tax_id = models.CharField(max_length=100, blank=True, help_text="TIN / VAT number")
     active = models.BooleanField(default=True)
+
+    # ── Document layout (PDF branding, configurable from Settings → Document Layout) ──
+    report_primary_color = models.CharField(
+        max_length=7, default="#2D7A71",
+        help_text="Hex color used for document titles, table totals, and links on PDFs (quotations, orders, invoices, reports).",
+    )
+    report_footer = models.TextField(
+        blank=True,
+        help_text="Extra line of text (e.g. registration number, bank details) shown under the contact line in every PDF's footer.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -175,6 +186,24 @@ class Partner(models.Model):
     def display_address(self):
         parts = [self.street, self.city, self.state, self.country]
         return ", ".join(p for p in parts if p)
+
+    @property
+    def address_lines(self):
+        """Multi-line postal address, e.g. for a document's "Bill To" block —
+        one line per address component, skipping anything left blank."""
+        lines = []
+        if self.street:
+            lines.append(self.street)
+        if self.street2:
+            lines.append(self.street2)
+        city_line = ", ".join(p for p in [self.city, self.state] if p)
+        if self.zip_code:
+            city_line = f"{city_line} {self.zip_code}".strip()
+        if city_line:
+            lines.append(city_line)
+        if self.country:
+            lines.append(self.country)
+        return lines
 
 
 # ─── Payment Terms ────────────────────────────────────────────────────────────
