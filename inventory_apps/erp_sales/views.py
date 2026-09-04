@@ -35,6 +35,12 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
             return qs.filter(active=True)
         return qs
 
+    def perform_create(self, serializer):
+        # The salesperson is whoever is creating the order — not something
+        # the "New Quotation" form asks for, so default it here rather than
+        # leaving it blank.
+        serializer.save(salesperson=self.request.user)
+
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
         order = self.get_object()

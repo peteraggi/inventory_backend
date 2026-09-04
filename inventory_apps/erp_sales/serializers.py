@@ -29,6 +29,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
     state_display = serializers.CharField(source="get_state_display", read_only=True)
     invoice_status = serializers.CharField(read_only=True)
     payment_term_name = serializers.SerializerMethodField()
+    salesperson_name = serializers.CharField(source="salesperson.name", read_only=True, default="")
 
     class Meta:
         model = SaleOrder
@@ -37,6 +38,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "state", "state_display",
             "date_order", "validity_date",
             "payment_term", "payment_term_name", "warehouse", "currency",
+            "salesperson", "salesperson_name",
             "note", "client_order_ref",
             "amount_untaxed", "amount_tax", "amount_total",
             "delivery_count", "invoice_count", "active",
@@ -75,10 +77,12 @@ class SaleOrderSerializer(serializers.ModelSerializer):
 class SaleOrderListSerializer(serializers.ModelSerializer):
     partner_name = serializers.CharField(source="partner.name", read_only=True)
     state_display = serializers.CharField(source="get_state_display", read_only=True)
+    salesperson_name = serializers.CharField(source="salesperson.name", read_only=True, default="")
 
     class Meta:
         model = SaleOrder
         fields = [
             "id", "name", "partner_name", "state", "state_display",
             "date_order", "amount_total", "delivery_count", "invoice_count",
+            "salesperson_name",
         ]

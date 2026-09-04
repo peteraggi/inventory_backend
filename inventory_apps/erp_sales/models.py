@@ -36,6 +36,10 @@ class SaleOrder(models.Model):
         "erp_inventory.Warehouse", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="sale_orders",
     )
+    salesperson = models.ForeignKey(
+        "authentication.User", on_delete=models.SET_NULL, null=True, blank=True,
+        db_constraint=False, related_name="sale_orders",
+    )
     currency = models.ForeignKey(
         "erp_base.Currency", on_delete=models.PROTECT, null=True, blank=True,
         related_name="sale_orders",
