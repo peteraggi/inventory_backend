@@ -38,7 +38,9 @@ class CompanySerializer(serializers.ModelSerializer):
             "id", "name", "currency", "currency_code", "currency_symbol", "logo",
             "street", "street2", "city", "state", "zip_code", "country",
             "phone", "email", "website", "tax_id", "active",
-            "report_primary_color", "report_footer",
+            "report_layout", "report_table_style", "report_font",
+            "report_primary_color", "report_secondary_color", "report_tagline",
+            "report_footer", "report_bank_account", "report_paper_format", "report_show_qr",
             "created_at", "updated_at",
         ]
 

@@ -106,13 +106,68 @@ class Company(models.Model):
     active = models.BooleanField(default=True)
 
     # ── Document layout (PDF branding, configurable from Settings → Document Layout) ──
+    # Mirrors Odoo's own "Configure your document layout" wizard, which has two
+    # independent style dimensions: the page/header template ("Layout") and the
+    # line-items table's own look ("Tables") — plus font, two accent colors,
+    # a tagline, a bank account line, paper size, and a payment-QR toggle.
+    REPORT_LAYOUT_CHOICES = [
+        ("standard", "Light"),
+        ("bubble", "Bubble"),
+        ("wave", "Wave"),
+        ("folder", "Folder"),
+        ("center", "Center"),
+        ("dual", "Dual"),
+        ("lines", "Lines"),
+    ]
+    REPORT_TABLE_STYLE_CHOICES = [
+        ("standard", "Light"),
+        ("boxed", "Boxed"),
+        ("bold", "Bold"),
+        ("striped", "Striped"),
+        ("bubble", "Bubble"),
+        ("column", "Column"),
+    ]
+    REPORT_FONT_CHOICES = [
+        ("Lato", "Lato"),
+        ("Roboto", "Roboto"),
+        ("Montserrat", "Montserrat"),
+        ("Oswald", "Oswald"),
+        ("Raleway", "Raleway"),
+    ]
+    REPORT_PAPER_FORMAT_CHOICES = [
+        ("a4", "A4"),
+        ("letter", "US Letter"),
+    ]
+    report_layout = models.CharField(
+        max_length=20, choices=REPORT_LAYOUT_CHOICES, default="standard",
+        help_text="Page/header template used for every generated PDF — mirrors Odoo's Layout picker (Light/Bubble/Wave/Folder/Center/Dual/Lines).",
+    )
+    report_table_style = models.CharField(
+        max_length=20, choices=REPORT_TABLE_STYLE_CHOICES, default="standard",
+        help_text="Line-items table style — mirrors Odoo's Tables picker (Light/Boxed/Bold/Striped/Bubble/Column).",
+    )
+    report_font = models.CharField(max_length=40, choices=REPORT_FONT_CHOICES, default="Lato")
     report_primary_color = models.CharField(
         max_length=7, default="#2D7A71",
-        help_text="Hex color used for document titles, table totals, and links on PDFs (quotations, orders, invoices, reports).",
+        help_text="Hex color used for document titles, table totals, and links on PDFs.",
+    )
+    report_secondary_color = models.CharField(max_length=7, default="#1A1A1A")
+    report_tagline = models.CharField(
+        max_length=255, blank=True,
+        help_text="Short slogan printed under the company name in the PDF header, e.g. \"Global Business Solutions\".",
     )
     report_footer = models.TextField(
         blank=True,
         help_text="Extra line of text (e.g. registration number, bank details) shown under the contact line in every PDF's footer.",
+    )
+    report_bank_account = models.CharField(
+        max_length=255, blank=True,
+        help_text="Bank account (e.g. IBAN) printed in the footer of invoices/bills for wire payment.",
+    )
+    report_paper_format = models.CharField(max_length=10, choices=REPORT_PAPER_FORMAT_CHOICES, default="a4")
+    report_show_qr = models.BooleanField(
+        default=False,
+        help_text="Print a payment QR code on invoices (encodes the invoice reference and amount due).",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
