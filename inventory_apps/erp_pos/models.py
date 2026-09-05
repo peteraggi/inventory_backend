@@ -102,11 +102,12 @@ class POSSession(models.Model):
     def __str__(self):
         return self.name or str(self.id)
 
-    def open_session(self, opening_balance: Decimal = Decimal("0.00")):
+    def open_session(self, opening_balance: Decimal = Decimal("0.00"), opening_notes: str = ""):
         self.state = "opened"
         self.opened_at = timezone.now()
         self.cash_register_balance_start = opening_balance
-        self.save(update_fields=["state", "opened_at", "cash_register_balance_start"])
+        self.opening_notes = opening_notes
+        self.save(update_fields=["state", "opened_at", "cash_register_balance_start", "opening_notes"])
 
     def close_session(self, closing_balance: Decimal = Decimal("0.00"), notes: str = ""):
         self.state = "closed"
@@ -206,6 +207,9 @@ class POSOrderLine(models.Model):
     qty = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("1.0000"))
     price_unit = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("0.0000"))
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    tax_exempt = models.BooleanField(
+        default=False, help_text="When set, this line's taxes are removed from the order total.",
+    )
     price_subtotal = models.DecimalField(
         max_digits=18, decimal_places=2, default=Decimal("0.00"), editable=False,
     )
@@ -225,7 +229,7 @@ class POSOrderLine(models.Model):
         disc = base * (self.discount / Decimal("100"))
         self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
         tax_total = Decimal("0.00")
-        if self.product_id:
+        if self.product_id and not self.tax_exempt:
             for tax in self.product.taxes.filter(active=True):
                 tax_total += tax.compute_amount(self.price_subtotal)
         self.price_tax = tax_total

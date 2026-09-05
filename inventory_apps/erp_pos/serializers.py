@@ -40,7 +40,7 @@ class POSSessionSerializer(serializers.ModelSerializer):
         model = POSSession
         fields = [
             "id", "name", "config", "config_name", "state",
-            "opened_at", "closed_at",
+            "opened_at", "closed_at", "opening_notes", "closing_notes",
             "cash_register_balance_start", "cash_register_balance_end",
             "cash_register_difference",
             "order_count", "total_payments",
@@ -64,7 +64,7 @@ class POSOrderLineSerializer(serializers.ModelSerializer):
         model = POSOrderLine
         fields = [
             "id", "product", "product_name",
-            "qty", "price_unit", "discount",
+            "qty", "price_unit", "discount", "tax_exempt",
             "price_subtotal", "price_tax", "price_subtotal_incl",
             "note",
         ]

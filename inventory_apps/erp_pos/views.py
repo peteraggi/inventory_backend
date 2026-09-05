@@ -36,8 +36,9 @@ class POSConfigViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         opening_balance = Decimal(str(request.data.get("opening_balance", "0")))
+        opening_notes = request.data.get("opening_notes", "")
         session = POSSession.objects.create(config=config)
-        session.open_session(opening_balance)
+        session.open_session(opening_balance, opening_notes)
         return Response(POSSessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
 
