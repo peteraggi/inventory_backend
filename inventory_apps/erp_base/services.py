@@ -154,6 +154,30 @@ class SetupService:
                 defaults={"active": True},
             )
 
+        # Tenant roles (Settings → Roles / Permissions) — fixed presets with a
+        # sensible default permission matrix per inventory_apps.erp_base.rbac_constants.
+        from inventory_apps.pos_app.models import Role
+        from inventory_apps.erp_base.rbac_constants import DEFAULT_ROLE_PERMISSIONS, DEFAULT_ROLE_DESCRIPTIONS
+
+        for role_name, display_name in Role.ROLE_CHOICES:
+            Role.objects.get_or_create(
+                name=role_name,
+                defaults={
+                    "display_name": display_name,
+                    "description": DEFAULT_ROLE_DESCRIPTIONS.get(role_name, ""),
+                    "permissions": DEFAULT_ROLE_PERMISSIONS.get(role_name, {}),
+                },
+            )
+
+        # Tenant modules (Settings → Modules) — everything on by default.
+        from inventory_apps.erp_base.models import TenantModule
+
+        for key, name in TenantModule.MODULE_CHOICES:
+            TenantModule.objects.get_or_create(
+                key=key,
+                defaults={"name": name, "enabled": True},
+            )
+
         return {
             "company": str(company.id),
             "currency": ngn.code,

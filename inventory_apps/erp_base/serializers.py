@@ -2,8 +2,15 @@ from rest_framework import serializers
 from inventory_apps.erp_base.models import (
     Company, Currency, CurrencyRate, Partner, PaymentTerm, PaymentTermLine,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup,
-    ProductTemplate, SequenceCounter, ActivityLog,
+    ProductTemplate, SequenceCounter, ActivityLog, TenantModule,
 )
+
+
+class TenantModuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TenantModule
+        fields = ["id", "key", "name", "description", "enabled"]
+        read_only_fields = ["id", "key", "name", "description"]
 
 
 class CurrencySerializer(serializers.ModelSerializer):

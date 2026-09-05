@@ -139,6 +139,22 @@ class RoleListView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
+class RoleDetailView(generics.RetrieveUpdateAPIView):
+    """Lets an admin edit a role's permission matrix (Settings → Permissions).
+    Roles themselves are a fixed preset (see Role.ROLE_CHOICES) — name and
+    display_name aren't editable here, only description/permissions."""
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer(self, *args, **kwargs):
+        serializer = super().get_serializer(*args, **kwargs)
+        if self.request.method in ("PUT", "PATCH"):
+            for field in ("name", "display_name"):
+                serializer.fields[field].read_only = True
+        return serializer
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CATEGORIES
 # ══════════════════════════════════════════════════════════════════════════════

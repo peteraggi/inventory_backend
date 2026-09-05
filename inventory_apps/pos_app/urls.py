@@ -6,6 +6,7 @@ from .views import (
     StoreListView,
     StoreDetailView,
     RoleListView,
+    RoleDetailView,
     # Categories & Products
     CategoryListCreateView,
     CategoryDetailView,
@@ -72,6 +73,7 @@ urlpatterns = [
     path("stores/", StoreListView.as_view(), name="store-list"),
     path("stores/me/", StoreDetailView.as_view(), name="store-detail"),
     path("roles/", RoleListView.as_view(), name="role-list"),
+    path("roles/<uuid:pk>/", RoleDetailView.as_view(), name="role-detail"),
     # ── Categories ────────────────────────────────────────────────────────────
     path("categories/", CategoryListCreateView.as_view(), name="category-list-create"),
     path("categories/<uuid:pk>/", CategoryDetailView.as_view(), name="category-detail"),

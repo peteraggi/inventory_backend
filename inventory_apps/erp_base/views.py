@@ -8,7 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from inventory_apps.erp_base.models import (
     Company, Currency, Partner, PaymentTerm,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup, ProductTemplate,
-    ActivityLog,
+    ActivityLog, TenantModule,
 )
 from inventory_apps.erp_base.serializers import (
     CompanySerializer, CurrencySerializer, CurrencyRateSerializer, PartnerSerializer,
@@ -16,7 +16,7 @@ from inventory_apps.erp_base.serializers import (
     UomCategorySerializer, UnitOfMeasureSerializer, ProductCategorySerializer,
     TaxSerializer, TaxGroupSerializer,
     ProductTemplateSerializer, ProductTemplateListSerializer,
-    ActivityLogSerializer,
+    ActivityLogSerializer, TenantModuleSerializer,
 )
 from inventory_apps.erp_base.services import SetupService
 
@@ -64,6 +64,16 @@ class CompanyViewSet(viewsets.ModelViewSet):
     def setup(self, request):
         result = SetupService.seed_default_data()
         return Response({"message": "Default data seeded", **result})
+
+
+class TenantModuleViewSet(viewsets.ModelViewSet):
+    """Settings → Modules: turn whole app modules on/off for this tenant.
+    Rows are seeded (see SetupService); only `enabled` is ever written."""
+    queryset = TenantModule.objects.all()
+    serializer_class = TenantModuleSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+    http_method_names = ["get", "patch", "head", "options"]
 
 
 class PartnerViewSet(viewsets.ModelViewSet):

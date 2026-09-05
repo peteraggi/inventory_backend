@@ -181,6 +181,39 @@ class Company(models.Model):
         return self.name
 
 
+# ─── Tenant module toggles (Settings → Modules) ──────────────────────────────
+
+
+class TenantModule(models.Model):
+    """One row per app module, per tenant (this model lives in the tenant
+    schema, so django-tenants already scopes it per-tenant) — lets an owner
+    turn a whole module off for their business, e.g. a service business with
+    no POS terminal. Dashboard and Settings are intentionally not toggleable
+    here: disabling Settings would lock a tenant out of re-enabling anything."""
+    MODULE_CHOICES = [
+        ("sales", "Sales"),
+        ("purchases", "Purchases"),
+        ("inventory", "Inventory"),
+        ("pos", "Point of Sale"),
+        ("accounting", "Accounting"),
+        ("contacts", "Contacts"),
+        ("reports", "Reports"),
+    ]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.CharField(max_length=20, choices=MODULE_CHOICES, unique=True)
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=255, blank=True)
+    enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["key"]
+
+    def __str__(self):
+        return self.name
+
+
 # ─── Partner (Customers & Vendors) ───────────────────────────────────────────
 
 

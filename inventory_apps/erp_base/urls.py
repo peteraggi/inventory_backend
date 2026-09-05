@@ -2,7 +2,7 @@ from rest_framework.routers import DefaultRouter
 from inventory_apps.erp_base.views import (
     CompanyViewSet, CurrencyViewSet, PartnerViewSet, PaymentTermViewSet,
     UomCategoryViewSet, UnitOfMeasureViewSet, ProductCategoryViewSet,
-    TaxGroupViewSet, TaxViewSet, ProductTemplateViewSet,
+    TaxGroupViewSet, TaxViewSet, ProductTemplateViewSet, TenantModuleViewSet,
 )
 
 router = DefaultRouter()
@@ -16,5 +16,6 @@ router.register("product-categories", ProductCategoryViewSet, basename="product-
 router.register("tax-groups", TaxGroupViewSet, basename="tax-group")
 router.register("taxes", TaxViewSet, basename="tax")
 router.register("products", ProductTemplateViewSet, basename="product")
+router.register("modules", TenantModuleViewSet, basename="tenant-module")
 
 urlpatterns = router.urls

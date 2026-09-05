@@ -210,6 +210,45 @@ class ReportViewSet(viewsets.ViewSet):
         ).prefetch_related("quants")
         low_stock_count = sum(1 for p in low_stock_products if p.qty_on_hand <= Decimal("5"))
 
+        # 14-day revenue trend (POS + confirmed sales orders combined per day) — for the dashboard's line chart.
+        sales_trend = []
+        for i in range(13, -1, -1):
+            day = today - timedelta(days=i)
+            pos_day = POSOrder.objects.filter(
+                state__in=pos_paid_states, date_order__date=day,
+            ).aggregate(total=Sum("amount_total"))["total"] or Decimal("0.00")
+            sale_day = SaleOrder.objects.filter(
+                state__in=sale_confirmed_states, date_order__date=day,
+            ).aggregate(total=Sum("amount_total"))["total"] or Decimal("0.00")
+            sales_trend.append({"date": day.isoformat(), "total": pos_day + sale_day})
+
+        # Top 5 products by units sold over the last 30 days (POS lines) — for the bar chart.
+        top_products = list(
+            POSOrderLine.objects.filter(
+                order__state__in=pos_paid_states, order__date_order__date__gte=month_ago,
+            )
+            .values("product__name")
+            .annotate(total_qty=Sum("qty"))
+            .order_by("-total_qty")[:5]
+        )
+        top_products = [
+            {"name": row["product__name"], "qty": row["total_qty"]} for row in top_products
+        ]
+
+        # Revenue split by sales channel over the last 30 days — for the donut chart.
+        channel_breakdown = [
+            {"channel": "POS", "total": sales_total(month_ago) - (
+                SaleOrder.objects.filter(
+                    state__in=sale_confirmed_states, date_order__date__gte=month_ago,
+                ).aggregate(total=Sum("amount_total"))["total"] or Decimal("0.00")
+            )},
+            {"channel": "Sales Orders", "total": (
+                SaleOrder.objects.filter(
+                    state__in=sale_confirmed_states, date_order__date__gte=month_ago,
+                ).aggregate(total=Sum("amount_total"))["total"] or Decimal("0.00")
+            )},
+        ]
+
         return Response({
             "today_sales": sales_total(today),
             "week_sales": sales_total(week_ago),
@@ -217,6 +256,9 @@ class ReportViewSet(viewsets.ViewSet):
             "order_count": order_count,
             "top_product": top_product,
             "low_stock_count": low_stock_count,
+            "sales_trend": sales_trend,
+            "top_products": top_products,
+            "channel_breakdown": channel_breakdown,
         })
 
     @action(detail=False, url_path="aged-payable")

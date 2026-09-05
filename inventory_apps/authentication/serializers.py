@@ -445,14 +445,22 @@ class MeSerializer(serializers.ModelSerializer):
     """Self-service profile for the logged-in user, including their signature."""
     role_name = serializers.CharField(source='role.display_name', read_only=True)
     store_name = serializers.CharField(source='store.name', read_only=True)
+    role_key = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'name', 'email', 'phone', 'bio', 'signature',
-            'role_name', 'store_name', 'created_at',
+            'role_name', 'role_key', 'permissions', 'store_name', 'created_at',
         ]
-        read_only_fields = ['id', 'email', 'role_name', 'store_name', 'created_at']
+        read_only_fields = ['id', 'email', 'role_name', 'role_key', 'permissions', 'store_name', 'created_at']
+
+    def get_role_key(self, obj):
+        return obj.role.name if obj.role_id else ""
+
+    def get_permissions(self, obj):
+        return obj.role.permissions if obj.role_id else {}
 
 
 class ChangePasswordSerializer(serializers.Serializer):
