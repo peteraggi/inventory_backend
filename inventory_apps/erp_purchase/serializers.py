@@ -5,6 +5,7 @@ from inventory_apps.erp_purchase.models import PurchaseOrder, PurchaseOrderLine
 
 class PurchaseOrderLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    product_uom_name = serializers.CharField(source="product_uom.name", read_only=True, default="")
     taxes = serializers.PrimaryKeyRelatedField(
         many=True, required=False, queryset=Tax.objects.filter(active=True),
     )
@@ -13,7 +14,7 @@ class PurchaseOrderLineSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrderLine
         fields = [
-            "id", "product", "product_name", "description",
+            "id", "product", "product_name", "product_uom", "product_uom_name", "description",
             "product_qty", "qty_received", "qty_billed",
             "price_unit", "taxes", "tax_names",
             "price_subtotal", "tax_amount", "price_total",

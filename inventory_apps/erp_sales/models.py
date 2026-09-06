@@ -118,6 +118,10 @@ class SaleOrderLine(models.Model):
     product = models.ForeignKey(
         "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="sale_lines",
     )
+    product_uom = models.ForeignKey(
+        "erp_base.UnitOfMeasure", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sale_order_lines",
+    )
     description = models.TextField(blank=True)
     product_uom_qty = models.DecimalField(
         max_digits=18, decimal_places=4, default=Decimal("1.0000"),
@@ -149,6 +153,8 @@ class SaleOrderLine(models.Model):
         ordering = ["sequence", "id"]
 
     def save(self, *args, **kwargs):
+        if not self.product_uom_id and self.product_id:
+            self.product_uom_id = self.product.product_template.uom_id
         base = self.price_unit * self.product_uom_qty
         disc = base * (self.discount / Decimal("100"))
         self.price_subtotal = (base - disc).quantize(Decimal("0.01"))

@@ -4,12 +4,13 @@ from inventory_apps.erp_sales.models import SaleOrder, SaleOrderLine
 
 class SaleOrderLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    product_uom_name = serializers.CharField(source="product_uom.name", read_only=True, default="")
     tax_names = serializers.SerializerMethodField()
 
     class Meta:
         model = SaleOrderLine
         fields = [
-            "id", "product", "product_name", "description",
+            "id", "product", "product_name", "product_uom", "product_uom_name", "description",
             "product_uom_qty", "qty_delivered", "qty_invoiced",
             "price_unit", "discount", "tax_names",
             "price_subtotal", "tax_amount", "price_total",
