@@ -278,7 +278,7 @@ class AccountMoveLine(models.Model):
 
     # Invoice tab fields
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.SET_NULL, null=True, blank=True,
+        "erp_base.ProductVariant", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="move_lines",
     )
     quantity = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("1.0000"))

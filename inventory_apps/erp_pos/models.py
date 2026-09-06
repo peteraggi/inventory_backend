@@ -202,7 +202,7 @@ class POSOrderLine(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(POSOrder, on_delete=models.CASCADE, related_name="lines")
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.PROTECT, related_name="pos_lines",
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="pos_lines",
     )
     qty = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("1.0000"))
     price_unit = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("0.0000"))

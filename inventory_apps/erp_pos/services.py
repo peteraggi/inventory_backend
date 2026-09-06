@@ -66,7 +66,6 @@ class POSService:
     def sync_offline_orders(cls, session, orders_data: list) -> list:
         """Sync orders sent from offline POS client. Returns created order IDs."""
         from inventory_apps.erp_pos.models import POSOrder, POSOrderLine, POSPayment, POSPaymentMethod
-        from inventory_apps.erp_base.models import Partner, ProductTemplate
 
         created = []
         for data in orders_data:

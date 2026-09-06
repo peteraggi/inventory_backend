@@ -103,7 +103,7 @@ class PurchaseOrderLine(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="lines")
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.PROTECT, related_name="purchase_lines",
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="purchase_lines",
     )
     description = models.TextField(blank=True)
     product_qty = models.DecimalField(

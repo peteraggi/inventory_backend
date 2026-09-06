@@ -2,6 +2,89 @@
 erp_base/services.py — Seed data and master data helpers.
 """
 from decimal import Decimal
+from itertools import product as cartesian_product
+
+
+class ProductVariantService:
+    """Every template must always have >=1 active ProductVariant — that's
+    the row every stock quant/move and sale/purchase/POS order line actually
+    references (Odoo's product.product), never the template directly. The
+    "default" variant is the one with no attribute_values at all; it's what
+    a template gets the moment it's created, before any attributes exist."""
+
+    @classmethod
+    def ensure_default_variant(cls, product_template):
+        """Guarantees the template has an active variant. No-op if one
+        already exists (default or a real combination); reactivates an
+        archived default rather than creating a duplicate."""
+        from inventory_apps.erp_base.models import ProductVariant
+
+        if product_template.variants.filter(active=True).exists():
+            return
+        default = product_template.variants.filter(attribute_values__isnull=True).first()
+        if default:
+            if not default.active:
+                default.active = True
+                default.save(update_fields=["active"])
+            return
+        ProductVariant.objects.create(product_template=product_template)
+
+    @classmethod
+    def regenerate_variants(cls, product_template):
+        """Recomputes `product_template.variants` from its current attribute
+        lines. Combinations that already exist as an (active or archived)
+        variant are reused/reactivated rather than recreated, so barcodes,
+        price extras and stock history survive edits to the attribute lines.
+        Combinations no longer possible are archived, never deleted."""
+        from django.db import transaction
+        from inventory_apps.erp_base.models import ProductVariant
+
+        lines = list(
+            product_template.attribute_lines.prefetch_related("values").all()
+        )
+
+        with transaction.atomic():
+            existing = {
+                frozenset(v.attribute_values.values_list("id", flat=True)): v
+                for v in product_template.variants.all()
+            }
+
+            if not lines:
+                # No attributes → fall back to the single default variant,
+                # archiving any real combinations left over from before.
+                for key, variant in existing.items():
+                    if key and variant.active:
+                        variant.active = False
+                        variant.save(update_fields=["active"])
+                cls.ensure_default_variant(product_template)
+                return
+
+            value_sets = [list(line.values.all()) for line in lines]
+            # A line with no values selected yet can't form any combination.
+            if any(len(values) == 0 for values in value_sets):
+                return
+
+            desired_combos = list(cartesian_product(*value_sets))
+            desired_keys = set()
+
+            for combo in desired_combos:
+                key = frozenset(v.id for v in combo)
+                desired_keys.add(key)
+                variant = existing.get(key)
+                if variant is None:
+                    variant = ProductVariant.objects.create(product_template=product_template)
+                    variant.attribute_values.set(combo)
+                elif not variant.active:
+                    variant.active = True
+                    variant.save(update_fields=["active"])
+
+            # Real combinations now exist, so the attribute-less default
+            # variant (key == empty frozenset) is retired along with any
+            # combination that's no longer possible.
+            for key, variant in existing.items():
+                if key not in desired_keys and variant.active:
+                    variant.active = False
+                    variant.save(update_fields=["active"])
 
 
 class SetupService:

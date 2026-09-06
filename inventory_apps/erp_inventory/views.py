@@ -41,7 +41,7 @@ class StockPickingTypeViewSet(viewsets.ModelViewSet):
 
 
 class StockLotViewSet(viewsets.ModelViewSet):
-    queryset = StockLot.objects.filter(active=True).select_related("product")
+    queryset = StockLot.objects.filter(active=True).select_related("product__product_template")
     serializer_class = StockLotSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
@@ -93,7 +93,7 @@ class StockPickingViewSet(viewsets.ModelViewSet):
 
 class StockMoveViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StockMove.objects.all().select_related(
-        "product", "location_src", "location_dest", "picking",
+        "product__product_template", "location_src", "location_dest", "picking",
     )
     serializer_class = StockMoveSerializer
     permission_classes = [IsAuthenticated]
@@ -104,12 +104,12 @@ class StockMoveViewSet(viewsets.ReadOnlyModelViewSet):
 class StockQuantViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StockQuant.objects.filter(
         location__usage="internal"
-    ).select_related("product", "location", "lot")
+    ).select_related("product__product_template", "location", "lot")
     serializer_class = StockQuantSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ["product", "location", "lot"]
-    search_fields = ["product__name"]
+    filterset_fields = ["product", "product__product_template", "location", "lot"]
+    search_fields = ["product__product_template__name"]
 
     @action(detail=False, url_path="report")
     def report(self, request):
@@ -126,7 +126,7 @@ class StockQuantViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class InventoryAdjustmentViewSet(viewsets.ModelViewSet):
-    queryset = StockInventoryAdjustment.objects.all().prefetch_related("lines__product")
+    queryset = StockInventoryAdjustment.objects.all().prefetch_related("lines__product__product_template")
     serializer_class = InventoryAdjustmentSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ["state"]
@@ -142,7 +142,7 @@ class InventoryAdjustmentViewSet(viewsets.ModelViewSet):
 
 
 class ReorderingRuleViewSet(viewsets.ModelViewSet):
-    queryset = ReorderingRule.objects.filter(active=True).select_related("product", "location", "warehouse")
+    queryset = ReorderingRule.objects.filter(active=True).select_related("product__product_template", "location", "warehouse")
     serializer_class = ReorderingRuleSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ["product", "warehouse"]

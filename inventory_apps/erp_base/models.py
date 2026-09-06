@@ -544,6 +544,16 @@ class ProductTemplate(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        if is_new:
+            # Every template needs at least one variant to actually be bought/
+            # sold/stocked against — Odoo's product.product always exists,
+            # even for a template with no attributes (see ProductVariantService).
+            from inventory_apps.erp_base.services import ProductVariantService
+            ProductVariantService.ensure_default_variant(self)
+
     @property
     def display_name(self):
         ref = f"[{self.internal_reference}] " if self.internal_reference else ""
@@ -551,10 +561,12 @@ class ProductTemplate(models.Model):
 
     @property
     def qty_on_hand(self) -> Decimal:
+        """Sums on-hand quantity across every variant of this template — the
+        actual stock rows live on ProductVariant (see StockQuant.product)."""
         from inventory_apps.erp_inventory.models import StockQuant
         from django.db.models import Sum
         result = StockQuant.objects.filter(
-            product=self,
+            product__product_template=self,
             location__usage="internal",
         ).aggregate(total=Sum("quantity"))
         return result["total"] or Decimal("0.00")
@@ -564,7 +576,7 @@ class ProductTemplate(models.Model):
         from inventory_apps.erp_inventory.models import StockQuant
         from django.db.models import Sum
         result = StockQuant.objects.filter(
-            product=self,
+            product__product_template=self,
             location__usage="internal",
         ).aggregate(
             total=models.ExpressionWrapper(
@@ -573,6 +585,200 @@ class ProductTemplate(models.Model):
             )
         )
         return result["total"] or Decimal("0.00")
+
+
+# ─── Product Attributes & Variants (Odoo's product.attribute / product.product) ─
+
+
+class ProductAttribute(models.Model):
+    """A variant dimension (e.g. "Color", "Size"), reusable across products."""
+    DISPLAY_TYPE_CHOICES = [
+        ("radio", "Radio Buttons"),
+        ("select", "Dropdown"),
+        ("color", "Color Swatches"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    display_type = models.CharField(max_length=10, choices=DISPLAY_TYPE_CHOICES, default="radio")
+    sequence = models.PositiveIntegerField(default=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sequence", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ProductAttributeValue(models.Model):
+    """One possible value of an attribute (e.g. "Red" for "Color")."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    attribute = models.ForeignKey(ProductAttribute, on_delete=models.CASCADE, related_name="values")
+    name = models.CharField(max_length=100)
+    html_color = models.CharField(
+        max_length=20, blank=True,
+        help_text="Hex color for swatch display, e.g. #FF0000 (only used when the attribute's display type is Color)",
+    )
+    sequence = models.PositiveIntegerField(default=10)
+
+    class Meta:
+        ordering = ["sequence", "name"]
+        unique_together = [("attribute", "name")]
+
+    def __str__(self):
+        return f"{self.attribute.name}: {self.name}"
+
+
+class ProductTemplateAttributeLine(models.Model):
+    """Which attributes — and which of their values — apply to one product,
+    e.g. Product "T-Shirt" uses attribute "Color" restricted to {Red, Blue}.
+    Saving/changing a line's values regenerates the product's variants
+    (see ProductService/regenerate_variants on the frontend-facing view)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product_template = models.ForeignKey(
+        ProductTemplate, on_delete=models.CASCADE, related_name="attribute_lines",
+    )
+    attribute = models.ForeignKey(
+        ProductAttribute, on_delete=models.CASCADE, related_name="template_lines",
+    )
+    values = models.ManyToManyField(ProductAttributeValue, related_name="template_lines")
+
+    class Meta:
+        ordering = ["attribute__sequence", "attribute__name"]
+        unique_together = [("product_template", "attribute")]
+
+    def __str__(self):
+        return f"{self.product_template.name} / {self.attribute.name}"
+
+
+class ProductVariant(models.Model):
+    """A concrete, sellable/stockable/purchasable unit — Odoo's
+    product.product. Every template always has at least one (the "default"
+    variant with no attribute values, auto-created in ProductTemplate.save())
+    since this is what every stock quant/move and sale/purchase/POS order
+    line actually references, never the template directly. Once a template
+    gets attribute lines, real combinations replace the default variant.
+    Combinations that fall out of the current attribute lines (a value gets
+    unchecked) are archived (active=False), never deleted, so past stock/
+    order history stays intact."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product_template = models.ForeignKey(
+        ProductTemplate, on_delete=models.CASCADE, related_name="variants",
+    )
+    attribute_values = models.ManyToManyField(ProductAttributeValue, related_name="variants")
+    internal_reference = models.CharField(
+        max_length=100, blank=True,
+        help_text="Falls back to the template's reference if left blank",
+    )
+    barcode = models.CharField(max_length=100, blank=True, db_index=True)
+    price_extra = models.DecimalField(
+        max_digits=18, decimal_places=2, default=Decimal("0.00"),
+        help_text="Added on top of the template's sales price for this combination",
+    )
+    image = models.ImageField(
+        upload_to="products/variants/", storage=TenantFileSystemStorage(), null=True, blank=True,
+    )
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["product_template__name"]
+
+    def __str__(self):
+        return self.display_name
+
+    @property
+    def display_name(self) -> str:
+        combo = ", ".join(v.name for v in self.attribute_values.all())
+        return f"{self.product_template.name} ({combo})" if combo else self.product_template.name
+
+    @property
+    def sale_price(self) -> Decimal:
+        return self.product_template.sale_price + self.price_extra
+
+    @property
+    def effective_reference(self) -> str:
+        return self.internal_reference or self.product_template.internal_reference
+
+    @property
+    def effective_barcode(self) -> str:
+        return self.barcode or self.product_template.barcode
+
+    @property
+    def qty_on_hand(self) -> Decimal:
+        from inventory_apps.erp_inventory.models import StockQuant
+        from django.db.models import Sum
+        result = StockQuant.objects.filter(
+            product=self, location__usage="internal",
+        ).aggregate(total=Sum("quantity"))
+        return result["total"] or Decimal("0.00")
+
+    @property
+    def qty_available(self) -> Decimal:
+        from inventory_apps.erp_inventory.models import StockQuant
+        from django.db.models import Sum
+        result = StockQuant.objects.filter(
+            product=self, location__usage="internal",
+        ).aggregate(
+            total=models.ExpressionWrapper(
+                models.Sum("quantity") - models.Sum("reserved_quantity"),
+                output_field=models.DecimalField(),
+            )
+        )
+        return result["total"] or Decimal("0.00")
+
+    # ── Delegation to the template — mirrors Odoo's product.product, which
+    # inherits (_inherits) most of its fields straight from product.template.
+    # Lets existing code written against "a product" (name, uom, taxes, …)
+    # keep working unchanged now that those FKs point at the variant.
+    @property
+    def name(self) -> str:
+        return self.product_template.name
+
+    @property
+    def uom(self):
+        return self.product_template.uom
+
+    @property
+    def purchase_uom(self):
+        return self.product_template.purchase_uom
+
+    @property
+    def category(self):
+        return self.product_template.category
+
+    @property
+    def product_type(self) -> str:
+        return self.product_template.product_type
+
+    @property
+    def standard_price(self) -> Decimal:
+        return self.product_template.standard_price
+
+    @property
+    def taxes(self):
+        return self.product_template.taxes
+
+    @property
+    def supplier_taxes(self):
+        return self.product_template.supplier_taxes
+
+    @property
+    def can_be_sold(self) -> bool:
+        return self.product_template.can_be_sold
+
+    @property
+    def can_be_purchased(self) -> bool:
+        return self.product_template.can_be_purchased
+
+    @property
+    def available_in_pos(self) -> bool:
+        return self.product_template.available_in_pos
+
+    @property
+    def invoice_policy(self) -> str:
+        return self.product_template.invoice_policy
 
 
 # ─── Activity Log (generic chatter, mirrors Odoo's mail.thread) ──────────────

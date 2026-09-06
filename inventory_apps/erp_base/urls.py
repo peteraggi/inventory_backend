@@ -3,6 +3,7 @@ from inventory_apps.erp_base.views import (
     CompanyViewSet, CurrencyViewSet, PartnerViewSet, PaymentTermViewSet,
     UomCategoryViewSet, UnitOfMeasureViewSet, ProductCategoryViewSet,
     TaxGroupViewSet, TaxViewSet, ProductTemplateViewSet, TenantModuleViewSet,
+    ProductAttributeViewSet, ProductVariantViewSet,
 )
 
 router = DefaultRouter()
@@ -17,5 +18,7 @@ router.register("tax-groups", TaxGroupViewSet, basename="tax-group")
 router.register("taxes", TaxViewSet, basename="tax")
 router.register("products", ProductTemplateViewSet, basename="product")
 router.register("modules", TenantModuleViewSet, basename="tenant-module")
+router.register("attributes", ProductAttributeViewSet, basename="product-attribute")
+router.register("product-variants", ProductVariantViewSet, basename="product-variant")
 
 urlpatterns = router.urls

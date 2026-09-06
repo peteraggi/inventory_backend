@@ -211,7 +211,7 @@ class StockLot(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, db_index=True)
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.CASCADE, related_name="lots",
+        "erp_base.ProductVariant", on_delete=models.CASCADE, related_name="lots",
     )
     ref = models.CharField(max_length=100, blank=True)
     expiration_date = models.DateTimeField(null=True, blank=True)
@@ -312,7 +312,7 @@ class StockMove(models.Model):
         related_name="move_lines",
     )
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.PROTECT, related_name="stock_moves",
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="stock_moves",
     )
     lot = models.ForeignKey(
         StockLot, on_delete=models.SET_NULL, null=True, blank=True, related_name="moves",
@@ -352,7 +352,7 @@ class StockQuant(models.Model):
     """Current stock on-hand per location/product/lot."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.CASCADE, related_name="quants",
+        "erp_base.ProductVariant", on_delete=models.CASCADE, related_name="quants",
     )
     location = models.ForeignKey(
         StockLocation, on_delete=models.CASCADE, related_name="quants",
@@ -369,7 +369,7 @@ class StockQuant(models.Model):
 
     class Meta:
         unique_together = [("product", "location", "lot")]
-        ordering = ["product__name"]
+        ordering = ["product__product_template__name"]
 
     def __str__(self):
         return f"{self.product.name} @ {self.location.name}: {self.quantity}"
@@ -404,7 +404,7 @@ class StockInventoryAdjustmentLine(models.Model):
         StockInventoryAdjustment, on_delete=models.CASCADE, related_name="lines",
     )
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.CASCADE, related_name="adjustment_lines",
+        "erp_base.ProductVariant", on_delete=models.CASCADE, related_name="adjustment_lines",
     )
     lot = models.ForeignKey(
         StockLot, on_delete=models.SET_NULL, null=True, blank=True, related_name="adjustment_lines",
@@ -430,7 +430,7 @@ class StockInventoryAdjustmentLine(models.Model):
 class ReorderingRule(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(
-        "erp_base.ProductTemplate", on_delete=models.CASCADE, related_name="reordering_rules",
+        "erp_base.ProductVariant", on_delete=models.CASCADE, related_name="reordering_rules",
     )
     location = models.ForeignKey(
         StockLocation, on_delete=models.CASCADE, related_name="reordering_rules",
@@ -448,7 +448,7 @@ class ReorderingRule(models.Model):
 
     class Meta:
         unique_together = [("product", "location")]
-        ordering = ["product__name"]
+        ordering = ["product__product_template__name"]
 
     def __str__(self):
         return f"Reorder {self.product.name}: min={self.min_qty}, max={self.max_qty}"

@@ -3,6 +3,7 @@ from inventory_apps.erp_base.models import (
     Company, Currency, CurrencyRate, Partner, PaymentTerm, PaymentTermLine,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup,
     ProductTemplate, SequenceCounter, ActivityLog, TenantModule,
+    ProductAttribute, ProductAttributeValue, ProductTemplateAttributeLine, ProductVariant,
 )
 
 
@@ -129,6 +130,99 @@ class PartnerSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProductAttributeValueSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(required=False)
+
+    class Meta:
+        model = ProductAttributeValue
+        fields = ["id", "name", "html_color", "sequence"]
+
+
+class ProductAttributeSerializer(serializers.ModelSerializer):
+    values = ProductAttributeValueSerializer(many=True, required=False)
+
+    class Meta:
+        model = ProductAttribute
+        fields = ["id", "name", "display_type", "sequence", "values"]
+
+    def create(self, validated_data):
+        values_data = validated_data.pop("values", [])
+        attribute = ProductAttribute.objects.create(**validated_data)
+        for value_data in values_data:
+            value_data.pop("id", None)
+            ProductAttributeValue.objects.create(attribute=attribute, **value_data)
+        return attribute
+
+    def update(self, instance, validated_data):
+        values_data = validated_data.pop("values", None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+
+        if values_data is not None:
+            kept_ids = set()
+            for value_data in values_data:
+                value_id = value_data.pop("id", None)
+                if value_id:
+                    ProductAttributeValue.objects.filter(id=value_id, attribute=instance).update(**value_data)
+                    kept_ids.add(str(value_id))
+                else:
+                    new_value = ProductAttributeValue.objects.create(attribute=instance, **value_data)
+                    kept_ids.add(str(new_value.id))
+            instance.values.exclude(id__in=kept_ids).delete()
+        return instance
+
+
+class ProductTemplateAttributeLineSerializer(serializers.ModelSerializer):
+    attribute_name = serializers.CharField(source="attribute.name", read_only=True)
+    values = ProductAttributeValueSerializer(many=True, read_only=True)
+    value_ids = serializers.PrimaryKeyRelatedField(
+        source="values", queryset=ProductAttributeValue.objects.all(), many=True, write_only=True,
+    )
+
+    class Meta:
+        model = ProductTemplateAttributeLine
+        fields = ["id", "attribute", "attribute_name", "values", "value_ids"]
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    """Doubles as the shape returned to any order-line product picker
+    (sales/purchase/POS/invoice/bill) — those pick a *variant*, never a
+    template directly, matching Odoo. Read-only fields beyond the variant's
+    own are delegated straight from the template (see ProductVariant's
+    Python properties in erp_base/models.py)."""
+    display_name = serializers.CharField(read_only=True)
+    sale_price = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    attribute_values = ProductAttributeValueSerializer(many=True, read_only=True)
+    template_name = serializers.CharField(source="product_template.name", read_only=True)
+    product_type = serializers.CharField(read_only=True)
+    uom = serializers.UUIDField(source="product_template.uom_id", read_only=True)
+    uom_name = serializers.CharField(source="product_template.uom.name", read_only=True, default="")
+    category_name = serializers.CharField(source="product_template.category.complete_name", read_only=True, default="")
+    standard_price = serializers.DecimalField(source="product_template.standard_price", max_digits=18, decimal_places=2, read_only=True)
+    taxes = serializers.PrimaryKeyRelatedField(source="product_template.taxes", many=True, read_only=True)
+    tax_names = serializers.SerializerMethodField()
+    supplier_taxes = serializers.PrimaryKeyRelatedField(source="product_template.supplier_taxes", many=True, read_only=True)
+    supplier_tax_names = serializers.SerializerMethodField()
+    available_in_pos = serializers.BooleanField(source="product_template.available_in_pos", read_only=True)
+
+    class Meta:
+        model = ProductVariant
+        fields = [
+            "id", "product_template", "template_name", "display_name", "attribute_values",
+            "internal_reference", "barcode", "price_extra", "sale_price", "standard_price",
+            "product_type", "uom", "uom_name", "category_name", "taxes", "tax_names",
+            "supplier_taxes", "supplier_tax_names", "available_in_pos", "image", "active",
+        ]
+        read_only_fields = ["id", "product_template", "attribute_values"]
+
+    def get_tax_names(self, obj):
+        return [t.name for t in obj.product_template.taxes.all()]
+
+    def get_supplier_tax_names(self, obj):
+        return [t.name for t in obj.product_template.supplier_taxes.all()]
+
+
 class ProductTemplateSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.complete_name", read_only=True)
     uom_name = serializers.CharField(source="uom.name", read_only=True)
@@ -139,6 +233,9 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
         max_digits=18, decimal_places=4, read_only=True,
     )
     tax_names = serializers.SerializerMethodField()
+    attribute_lines = ProductTemplateAttributeLineSerializer(many=True, read_only=True)
+    variants = serializers.SerializerMethodField()
+    variant_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductTemplate
@@ -152,17 +249,25 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
             "active", "can_be_sold", "can_be_purchased", "available_in_pos",
             "is_favorite", "image", "notes",
             "qty_on_hand", "qty_available",
+            "attribute_lines", "variants", "variant_count",
             "created_at", "updated_at",
         ]
 
     def get_tax_names(self, obj):
         return [t.name for t in obj.taxes.all()]
 
+    def get_variants(self, obj):
+        return ProductVariantSerializer(obj.variants.filter(active=True), many=True).data
+
+    def get_variant_count(self, obj):
+        return obj.variants.filter(active=True).count()
+
 
 class ProductTemplateListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.complete_name", read_only=True)
     uom_name = serializers.CharField(source="uom.name", read_only=True)
     qty_on_hand = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
+    variant_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductTemplate
@@ -170,8 +275,11 @@ class ProductTemplateListSerializer(serializers.ModelSerializer):
             "id", "name", "internal_reference", "barcode",
             "product_type", "category_name", "uom_name", "image",
             "sale_price", "standard_price", "taxes", "supplier_taxes",
-            "qty_on_hand", "active", "is_favorite",
+            "qty_on_hand", "active", "is_favorite", "variant_count",
         ]
+
+    def get_variant_count(self, obj):
+        return obj.variants.filter(active=True).count()
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

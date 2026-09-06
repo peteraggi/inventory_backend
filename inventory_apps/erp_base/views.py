@@ -9,6 +9,7 @@ from inventory_apps.erp_base.models import (
     Company, Currency, Partner, PaymentTerm,
     UomCategory, UnitOfMeasure, ProductCategory, Tax, TaxGroup, ProductTemplate,
     ActivityLog, TenantModule,
+    ProductAttribute, ProductTemplateAttributeLine, ProductVariant,
 )
 from inventory_apps.erp_base.serializers import (
     CompanySerializer, CurrencySerializer, CurrencyRateSerializer, PartnerSerializer,
@@ -17,8 +18,9 @@ from inventory_apps.erp_base.serializers import (
     TaxSerializer, TaxGroupSerializer,
     ProductTemplateSerializer, ProductTemplateListSerializer,
     ActivityLogSerializer, TenantModuleSerializer,
+    ProductAttributeSerializer, ProductTemplateAttributeLineSerializer, ProductVariantSerializer,
 )
-from inventory_apps.erp_base.services import SetupService
+from inventory_apps.erp_base.services import SetupService, ProductVariantService
 
 # Fields tracked for chatter change-log entries on ProductTemplate, and their
 # display labels — mirrors Odoo's tracking=True field convention.
@@ -221,7 +223,78 @@ class ProductTemplateViewSet(viewsets.ModelViewSet):
         products = (
             self.get_queryset()
             .filter(product_type="storable")
-            .prefetch_related("quants")
+            .prefetch_related("variants__quants")
         )
         low = [p for p in products if p.qty_on_hand <= Decimal("5")]
         return Response(ProductTemplateListSerializer(low, many=True).data)
+
+    @action(detail=True, methods=["get", "put"], url_path="attribute-lines")
+    def attribute_lines(self, request, pk=None):
+        """GET: this product's current attribute lines (which attributes +
+        which of their values apply). PUT: replace the whole set in one go
+        — expects [{attribute: <uuid>, value_ids: [<uuid>, ...]}, ...] — then
+        regenerates variants from the new lines (see ProductVariantService)."""
+        product = self.get_object()
+        if request.method == "GET":
+            lines = product.attribute_lines.prefetch_related("values", "attribute")
+            return Response(ProductTemplateAttributeLineSerializer(lines, many=True).data)
+
+        incoming = request.data if isinstance(request.data, list) else []
+        seen_attribute_ids = set()
+        for line_data in incoming:
+            serializer = ProductTemplateAttributeLineSerializer(data=line_data)
+            serializer.is_valid(raise_exception=True)
+            attribute = serializer.validated_data["attribute"]
+            values = serializer.validated_data["values"]
+            seen_attribute_ids.add(str(attribute.id))
+            line, _ = ProductTemplateAttributeLine.objects.update_or_create(
+                product_template=product, attribute=attribute,
+            )
+            line.values.set(values)
+
+        product.attribute_lines.exclude(attribute_id__in=seen_attribute_ids).delete()
+        ProductVariantService.regenerate_variants(product)
+
+        lines = product.attribute_lines.prefetch_related("values", "attribute")
+        return Response(ProductTemplateAttributeLineSerializer(lines, many=True).data)
+
+    @action(detail=True, url_path="variants")
+    def variants(self, request, pk=None):
+        product = self.get_object()
+        variants = product.variants.filter(active=True).prefetch_related("attribute_values")
+        return Response(ProductVariantSerializer(variants, many=True).data)
+
+
+class ProductAttributeViewSet(viewsets.ModelViewSet):
+    """Settings/Inventory → Configuration → Attributes: reusable variant
+    dimensions (Color, Size, …) with their possible values."""
+    queryset = ProductAttribute.objects.all().prefetch_related("values")
+    serializer_class = ProductAttributeSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+
+class ProductVariantViewSet(viewsets.ModelViewSet):
+    """Read + light edit (barcode, reference, price extra, active) of one
+    generated variant. Variants themselves are created/archived only via
+    ProductTemplateViewSet.attribute_lines, never directly.
+
+    Also doubles as the product picker for every order-line form (sales,
+    purchase, POS, invoices, bills) — those pick a variant, never a template
+    directly, matching Odoo. `search` matches the variant's own reference/
+    barcode or its template's name/reference/barcode."""
+    queryset = (
+        ProductVariant.objects.all()
+        .select_related("product_template", "product_template__uom", "product_template__category")
+        .prefetch_related("attribute_values", "product_template__taxes")
+    )
+    serializer_class = ProductVariantSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["product_template", "active", "product_template__available_in_pos"]
+    search_fields = [
+        "product_template__name", "product_template__internal_reference", "product_template__barcode",
+        "internal_reference", "barcode",
+    ]
+    pagination_class = None
+    http_method_names = ["get", "patch", "head", "options"]

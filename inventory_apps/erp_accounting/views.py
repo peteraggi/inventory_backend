@@ -198,16 +198,16 @@ class ReportViewSet(viewsets.ViewSet):
             POSOrderLine.objects.filter(
                 order__state__in=pos_paid_states, order__date_order__date=today,
             )
-            .values("product__name")
+            .values("product__product_template__name")
             .annotate(total_qty=Sum("qty"))
             .order_by("-total_qty")
             .first()
         )
-        top_product = top_line["product__name"] if top_line else "N/A"
+        top_product = top_line["product__product_template__name"] if top_line else "N/A"
 
         low_stock_products = ProductTemplate.objects.filter(
             product_type="storable"
-        ).prefetch_related("quants")
+        ).prefetch_related("variants__quants")
         low_stock_count = sum(1 for p in low_stock_products if p.qty_on_hand <= Decimal("5"))
 
         # 14-day revenue trend (POS + confirmed sales orders combined per day) — for the dashboard's line chart.
@@ -227,12 +227,12 @@ class ReportViewSet(viewsets.ViewSet):
             POSOrderLine.objects.filter(
                 order__state__in=pos_paid_states, order__date_order__date__gte=month_ago,
             )
-            .values("product__name")
+            .values("product__product_template__name")
             .annotate(total_qty=Sum("qty"))
             .order_by("-total_qty")[:5]
         )
         top_products = [
-            {"name": row["product__name"], "qty": row["total_qty"]} for row in top_products
+            {"name": row["product__product_template__name"], "qty": row["total_qty"]} for row in top_products
         ]
 
         # Revenue split by sales channel over the last 30 days — for the donut chart.

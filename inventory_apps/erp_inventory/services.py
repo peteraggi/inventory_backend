@@ -78,18 +78,17 @@ class StockService:
     @classmethod
     def get_stock_report(cls, warehouse=None):
         from inventory_apps.erp_inventory.models import StockQuant
-        from inventory_apps.erp_base.models import ProductTemplate
         from django.db.models import Sum, F
 
         qs = StockQuant.objects.filter(location__usage="internal").select_related(
-            "product", "location", "lot"
+            "product__product_template", "location", "lot"
         )
         if warehouse:
             qs = qs.filter(location__warehouse=warehouse)
 
         return qs.values(
             product_id=F("product__id"),
-            product_name=F("product__name"),
+            product_name=F("product__product_template__name"),
             location_name=F("location__complete_name"),
         ).annotate(
             qty_on_hand=Sum("quantity"),
