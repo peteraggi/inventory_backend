@@ -1,0 +1,60 @@
+"""
+Tenant schema URL configuration.
+This file is served for every request to a tenant subdomain
+(e.g. acme.api.logsng.tech).
+Public-schema requests (api.logsng.tech) go to urls_public.py instead.
+"""
+from django.contrib import admin
+from django.urls import path, include
+from rest_framework import permissions
+from rest_framework_simplejwt.views import TokenRefreshView
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+
+from inventory_core import settings
+from inventory_core.views import health_check
+
+# Define API patterns first so swagger only documents these routes.
+_tenant_api_patterns = [
+    path('auth/', include('inventory_apps.authentication.urls')),
+    path('pos/', include('inventory_apps.pos_app.urls')),
+    # ERP module routes
+    path('erp/base/', include('inventory_apps.erp_base.urls')),
+    path('erp/inventory/', include('inventory_apps.erp_inventory.urls')),
+    path('erp/sales/', include('inventory_apps.erp_sales.urls')),
+    path('erp/purchase/', include('inventory_apps.erp_purchase.urls')),
+    path('erp/accounting/', include('inventory_apps.erp_accounting.urls')),
+    path('erp/pos/', include('inventory_apps.erp_pos.urls')),
+]
+
+schema_view = get_schema_view(
+    openapi.Info(
+        title='LogsInventory Tenant API',
+        default_version='v1',
+        description='Per-tenant API: authentication, POS and inventory.',
+        contact=openapi.Contact(email='logscontactmail@gmail.com'),
+        license=openapi.License(name='AEACBIO License'),
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+    authentication_classes=[],
+    patterns=_tenant_api_patterns,
+)
+
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('health/', health_check, name='health_check'),
+    path('internal/', include('inventory_apps.infrastructure.caddy.urls')),
+
+    # Swagger
+    path('', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('api/api.json/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+
+    *_tenant_api_patterns,
+]
+
+if settings.DEBUG:
+    from django.conf.urls.static import static
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,173 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Bulk Product Upload{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto; padding: 20px;">
+    <h1 style="color: #1f2937; margin-bottom: 10px;">
+        📦 Bulk Product Upload
+    </h1>
+    <p style="color: #6b7280; margin-bottom: 30px;">
+        Upload multiple products at once using an Excel file
+    </p>
+
+    <!-- Instructions Card -->
+    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+        <h2 style="color: #0369a1; margin-top: 0; margin-bottom: 15px; font-size: 18px;">
+            📋 How to Use Bulk Upload
+        </h2>
+        
+        <ol style="color: #0c4a6e; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li><strong>Download the template</strong> - Click the button below to get the Excel template</li>
+            <li><strong>Fill in your products</strong> - Add your product data in the "Products" sheet</li>
+            <li><strong>Follow the instructions</strong> - Read the "Instructions" sheet in the template</li>
+            <li><strong>Check categories</strong> - Refer to the "Categories" sheet for valid category names</li>
+            <li><strong>Save the file</strong> - Save your completed Excel file</li>
+            <li><strong>Upload here</strong> - Use the form below to upload your file</li>
+        </ol>
+    </div>
+
+    <!-- Download Template Section -->
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h3 style="color: #1f2937; margin-top: 0; margin-bottom: 15px; font-size: 16px;">
+            Step 1: Download Template
+        </h3>
+        <p style="color: #6b7280; margin-bottom: 20px;">
+            Download the Excel template with sample data and instructions
+        </p>
+        
+        <a href="{% url 'admin:pos_app_product_download_template' %}"
+           style="display: inline-block; background: #16a34a; color: white; padding: 12px 24px;
+                  border-radius: 6px; text-decoration: none; font-weight: 600; transition: background 0.2s;"
+           onmouseover="this.style.background='#15803d'"
+           onmouseout="this.style.background='#16a34a'">
+            ⬇️ Download Excel Template
+        </a>
+
+        <div style="margin-top: 15px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+            <p style="margin: 0; color: #92400e; font-size: 14px;">
+                <strong>💡 Tip:</strong> The template includes sample data. Delete the sample rows before uploading your actual products.
+            </p>
+        </div>
+    </div>
+
+    <!-- Upload Section -->
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h3 style="color: #1f2937; margin-top: 0; margin-bottom: 15px; font-size: 16px;">
+            Step 2: Upload Completed File
+        </h3>
+        <p style="color: #6b7280; margin-bottom: 20px;">
+            Select your completed Excel file and upload it
+        </p>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div style="margin-bottom: 20px;">
+                <label for="excel_file"
+                       style="display: block; color: #374151; font-weight: 600; margin-bottom: 8px;">
+                    Select Excel File *
+                </label>
+
+                <div style="position: relative;">
+                    <input type="file"
+                           id="excel_file"
+                           name="excel_file"
+                           accept=".xlsx,.xls"
+                           required
+                           style="display: block; width: 100%; padding: 10px; border: 2px solid #d1d5db;
+                                  border-radius: 6px; font-size: 14px; cursor: pointer;"
+                           onchange="updateFileName(this)">
+                </div>
+
+                <p id="file-name" style="margin-top: 8px; color: #6b7280; font-size: 14px; font-style: italic;">
+                    No file selected
+                </p>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button type="submit"
+                        style="background: #2563eb; color: white; padding: 12px 30px; border: none;
+                               border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer;
+                               transition: background 0.2s;"
+                        onmouseover="this.style.background='#1d4ed8'"
+                        onmouseout="this.style.background='#2563eb'">
+                    📤 Upload Products
+                </button>
+
+                <a href="{% url 'admin:pos_app_product_changelist' %}"
+                   style="color: #6b7280; text-decoration: none; padding: 12px 20px;
+                          border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;"
+                   onmouseover="this.style.background='#f3f4f6'"
+                   onmouseout="this.style.background='transparent'">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Important Notes -->
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin-top: 25px;">
+        <h3 style="color: #991b1b; margin-top: 0; margin-bottom: 15px; font-size: 16px;">
+            ⚠️ Important Notes
+        </h3>
+        <ul style="color: #7f1d1d; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li><strong>Barcode and SKU must be unique</strong> - Duplicates will be rejected</li>
+            <li><strong>All prices must be positive numbers</strong></li>
+            <li><strong>Category names must match existing categories</strong> - Check the Categories sheet in template</li>
+            <li><strong>Required fields cannot be empty</strong> - Fields marked with * are mandatory</li>
+            <li><strong>File format must be .xlsx or .xls</strong></li>
+            <li><strong>Large uploads may take time</strong> - Please be patient and don't refresh the page</li>
+        </ul>
+    </div>
+
+    <!-- Additional Actions -->
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+        <h3 style="color: #1f2937; margin-bottom: 15px; font-size: 16px;">
+            📊 Additional Actions
+        </h3>
+
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+            <a href="{% url 'admin:pos_app_product_export_excel' %}"
+               style="display: inline-block; background: #7c3aed; color: white; padding: 10px 20px; 
+                      border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;"
+               onmouseover="this.style.background='#6d28d9'" 
+               onmouseout="this.style.background='#7c3aed'">
+                📥 Export Existing Products
+            </a>
+            
+            <a href="{% url 'admin:pos_app_product_add' %}" 
+               style="display: inline-block; background: #059669; color: white; padding: 10px 20px; 
+                      border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;"
+               onmouseover="this.style.background='#047857'" 
+               onmouseout="this.style.background='#059669'">
+                ➕ Add Single Product
+            </a>
+            
+            <a href="{% url 'admin:pos_app_category_changelist' %}" 
+               style="display: inline-block; background: #0891b2; color: white; padding: 10px 20px; 
+                      border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;"
+               onmouseover="this.style.background='#0e7490'" 
+               onmouseout="this.style.background='#0891b2'">
+                🏷️ Manage Categories
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateFileName(input) {
+    const fileNameDisplay = document.getElementById('file-name');
+    if (input.files && input.files[0]) {
+        fileNameDisplay.textContent = '✓ Selected: ' + input.files[0].name;
+        fileNameDisplay.style.color = '#16a34a';
+        fileNameDisplay.style.fontWeight = '600';
+    } else {
+        fileNameDisplay.textContent = 'No file selected';
+        fileNameDisplay.style.color = '#6b7280';
+        fileNameDisplay.style.fontWeight = 'normal';
+    }
+}
+</script>
+{% endblock %}

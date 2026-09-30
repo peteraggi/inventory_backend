@@ -1,0 +1,54 @@
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://tls_ask_service:8000/internal/tls-ask/
+	}
+}
+
+# Redirect all HTTP → HTTPS
+http:// {
+	redir https://{host}{uri} permanent
+}
+
+# ── Frontend ─────────────────────────────────────────────────────────────────
+# logsng.tech and www.logsng.tech → Next.js container
+logsng.tech, www.logsng.tech {
+	encode gzip
+	reverse_proxy logs_frontend:3000
+}
+
+# ── Backend: public API ───────────────────────────────────────────────────────
+# api.logsng.tech → Django (public schema: onboarding + plans)
+api.logsng.tech {
+	encode gzip
+	# Django only serves /media/* itself when DEBUG=True; in production Caddy
+	# serves uploaded files (product images, logos, etc.) directly from the
+	# shared media_files volume instead.
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
+	reverse_proxy inventory_backend_app:8400
+}
+
+# ── Backend: tenant subdomains ────────────────────────────────────────────────
+# Catch-all handles any hostname not matched by the named blocks above.
+# on_demand TLS provisions an individual cert per subdomain via HTTP-01 challenge;
+# the tls-ask callback gates which hostnames get certs.
+#
+# IMPORTANT: Do NOT use *.api.logsng.tech here — Caddy treats that as a wildcard
+# site address and requests a wildcard cert (requires DNS-01 ACME challenge).
+# The catch-all https:// + on_demand combo issues individual certs per subdomain.
+https:// {
+	tls {
+		on_demand
+	}
+	encode gzip
+	# Same media handling as api.logsng.tech — tenant media is schema-prefixed
+	# within the shared volume, so any subdomain can serve any tenant's files.
+	handle_path /media/* {
+		root * /srv/media
+		file_server
+	}
+	reverse_proxy inventory_backend_app:8400
+}
