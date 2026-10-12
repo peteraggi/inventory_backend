@@ -24,6 +24,13 @@ class SaleOrderLineSerializer(serializers.ModelSerializer):
         return [t.name for t in obj.product.taxes.filter(active=True)]
 
 
+QUOTATION_TERM_FIELDS = [
+    "delivery_days", "delivery_words", "validity_days", "validity_words",
+    "payment_grace_days", "payment_words", "initial_payment_percentage",
+    "last_payment_percentage", "payment_method_words", "bank_details",
+]
+
+
 class SaleOrderSerializer(serializers.ModelSerializer):
     lines = SaleOrderLineSerializer(many=True)
     partner_name = serializers.CharField(source="partner.name", read_only=True)
@@ -32,16 +39,30 @@ class SaleOrderSerializer(serializers.ModelSerializer):
     invoice_status = serializers.CharField(read_only=True)
     payment_term_name = serializers.SerializerMethodField()
     salesperson_name = serializers.CharField(source="salesperson.name", read_only=True, default="")
+    salesperson_email = serializers.CharField(source="salesperson.email", read_only=True, default="")
+    salesperson_phone = serializers.CharField(source="salesperson.phone", read_only=True, default="")
+    salesperson_signature = serializers.ImageField(source="salesperson.signature", read_only=True, default=None)
+    partner_email = serializers.CharField(source="partner.email", read_only=True, default="")
+    partner_phone = serializers.CharField(source="partner.phone", read_only=True, default="")
+    currency_name = serializers.CharField(source="currency.name", read_only=True, default="")
+    currency_symbol = serializers.CharField(source="currency.symbol", read_only=True, default="")
+    revision_of_name = serializers.CharField(source="revision_of.name", read_only=True, default="")
+    revision_family = serializers.SerializerMethodField()
 
     class Meta:
         model = SaleOrder
         fields = [
             "id", "name", "partner", "partner_name", "partner_address_lines",
+            "partner_email", "partner_phone",
             "state", "state_display",
             "date_order", "validity_date",
             "payment_term", "payment_term_name", "warehouse", "currency",
-            "salesperson", "salesperson_name",
+            "currency_name", "currency_symbol",
+            "salesperson", "salesperson_name", "salesperson_email",
+            "salesperson_phone", "salesperson_signature",
             "note", "client_order_ref",
+            *QUOTATION_TERM_FIELDS,
+            "revision_of", "revision_of_name", "revision", "revision_family",
             "amount_untaxed", "amount_tax", "amount_total",
             "delivery_count", "invoice_count", "active",
             "invoice_status", "lines",
@@ -50,7 +71,16 @@ class SaleOrderSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "name", "state", "amount_untaxed", "amount_tax", "amount_total",
             "delivery_count", "invoice_count", "active",
+            "revision_of", "revision",
         ]
+
+    def get_revision_family(self, obj):
+        """The original quotation plus all of its revisions, oldest first."""
+        root = obj.revision_of or obj
+        family = [root, *root.revisions.order_by("revision")]
+        if len(family) == 1:
+            return []
+        return SaleOrderListSerializer(family, many=True).data
 
     def get_payment_term_name(self, obj):
         return obj.payment_term.name if obj.payment_term_id else ""
@@ -81,13 +111,22 @@ class SaleOrderSerializer(serializers.ModelSerializer):
 
 class SaleOrderListSerializer(serializers.ModelSerializer):
     partner_name = serializers.CharField(source="partner.name", read_only=True)
+    revision_count = serializers.SerializerMethodField()
     state_display = serializers.CharField(source="get_state_display", read_only=True)
     salesperson_name = serializers.CharField(source="salesperson.name", read_only=True, default="")
 
     class Meta:
         model = SaleOrder
         fields = [
-            "id", "name", "partner_name", "state", "state_display",
-            "date_order", "amount_total", "delivery_count", "invoice_count",
-            "salesperson_name",
+            "id", "name", "partner", "partner_name", "state", "state_display",
+            "date_order", "validity_date", "client_order_ref",
+            "amount_untaxed", "amount_tax", "amount_total",
+            "delivery_count", "invoice_count",
+            "salesperson_name", "revision_of", "revision", "revision_count",
         ]
+
+    def get_revision_count(self, obj):
+        # Annotated by SaleOrderViewSet's list queryset; fall back to a query
+        # when serialized elsewhere (e.g. a quotation's revision family).
+        annotated = getattr(obj, "revision_count_annotated", None)
+        return annotated if annotated is not None else obj.revisions.count()

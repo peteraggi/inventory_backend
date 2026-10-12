@@ -1,3 +1,4 @@
+from django.db.models import Count
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,7 +21,7 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "partner__name", "client_order_ref"]
-    filterset_fields = ["state", "partner"]
+    filterset_fields = ["state", "partner", "revision_of"]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -30,10 +31,23 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         if self.action == "list":
-            if self.request.query_params.get("archived") == "true":
+            params = self.request.query_params
+            qs = qs.annotate(revision_count_annotated=Count("revisions"))
+            # `state__in=draft,sent` lets the Quotations view list both
+            # quotation states in one request.
+            if params.get("state__in"):
+                qs = qs.filter(state__in=params["state__in"].split(","))
+            # `root_only=true` hides revisions so the list can nest them
+            # under their original quotation.
+            if params.get("root_only") == "true":
+                qs = qs.filter(revision_of__isnull=True)
+            if params.get("archived") == "true":
                 return qs.filter(active=False)
             return qs.filter(active=True)
         return qs
+
+    def _detail(self, order):
+        return SaleOrderSerializer(order, context=self.get_serializer_context()).data
 
     def perform_create(self, serializer):
         # The salesperson is whoever is creating the order — not something
@@ -48,7 +62,7 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
             order.action_send()
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(SaleOrderSerializer(order).data)
+        return Response(self._detail(order))
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
@@ -57,13 +71,22 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
             SalesService.confirm_sale_order(order)
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(SaleOrderSerializer(order).data)
+        return Response(self._detail(order))
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         order = self.get_object()
         order.action_cancel()
-        return Response(SaleOrderSerializer(order).data)
+        return Response(self._detail(order))
+
+    @action(detail=True, methods=["post"])
+    def revise(self, request, pk=None):
+        order = self.get_object()
+        try:
+            revision = SalesService.create_revision(order, user=request.user)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self._detail(revision), status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="create-invoice")
     def create_invoice(self, request, pk=None):
@@ -94,14 +117,14 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
         order = self.get_object()
         order.active = False
         order.save(update_fields=["active"])
-        return Response(SaleOrderSerializer(order).data)
+        return Response(self._detail(order))
 
     @action(detail=True, methods=["post"])
     def unarchive(self, request, pk=None):
         order = self.get_object()
         order.active = True
         order.save(update_fields=["active"])
-        return Response(SaleOrderSerializer(order).data)
+        return Response(self._detail(order))
 
     @action(detail=True, url_path="pdf")
     def pdf(self, request, pk=None):

@@ -81,3 +81,48 @@ class SalesService:
         sale_order.invoice_count += 1
         sale_order.save(update_fields=["invoice_count"])
         return move
+
+    # Fields copied verbatim when a quotation is revised.
+    REVISION_COPY_FIELDS = [
+        "partner_id", "company_id", "payment_term_id", "warehouse_id", "currency_id",
+        "note", "client_order_ref",
+        "delivery_days", "delivery_words", "validity_days", "validity_words",
+        "payment_grace_days", "payment_words", "initial_payment_percentage",
+        "last_payment_percentage", "payment_method_words", "bank_details",
+    ]
+    REVISION_LINE_COPY_FIELDS = [
+        "product_id", "product_uom_id", "description", "product_uom_qty",
+        "price_unit", "discount", "sequence",
+    ]
+
+    @classmethod
+    @transaction.atomic
+    def create_revision(cls, sale_order, user=None):
+        """Copy a quotation into a new draft revision of the same root
+        quotation (OAS "quotation variant"). The original is left untouched so
+        the customer can be offered alternatives side by side."""
+        from django.db.models import Max
+        from inventory_apps.erp_sales.models import SaleOrder, SaleOrderLine
+
+        if sale_order.state not in ("draft", "sent"):
+            raise ValueError("Only quotations (not confirmed orders) can be revised")
+
+        root = sale_order.revision_of or sale_order
+        last = root.revisions.aggregate(m=Max("revision"))["m"] or root.revision
+        number = last + 1
+
+        new_order = SaleOrder(
+            name=f"{root.name}-R{number}",
+            revision_of=root,
+            revision=number,
+            salesperson=user or sale_order.salesperson,
+            **{f: getattr(sale_order, f) for f in cls.REVISION_COPY_FIELDS},
+        )
+        new_order.save()
+        for line in sale_order.lines.all():
+            SaleOrderLine.objects.create(
+                order=new_order,
+                **{f: getattr(line, f) for f in cls.REVISION_LINE_COPY_FIELDS},
+            )
+        new_order.compute_totals()
+        return new_order
