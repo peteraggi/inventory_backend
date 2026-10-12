@@ -1,4 +1,6 @@
-from django.db.models import Count
+from django.db.models import Count, Q, Sum
+from django.utils import timezone
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,11 +16,18 @@ from inventory_apps.erp_sales.services import SalesService
 from inventory_core.pdf import render_pdf
 
 
+class SaleOrderPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class SaleOrderViewSet(viewsets.ModelViewSet):
     queryset = SaleOrder.objects.all().select_related(
         "partner", "company", "currency", "payment_term", "warehouse"
     ).prefetch_related("lines__product")
     permission_classes = [IsAuthenticated]
+    pagination_class = SaleOrderPagination
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "partner__name", "client_order_ref"]
     filterset_fields = ["state", "partner", "revision_of"]
@@ -30,9 +39,10 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if self.action == "list":
+        if self.action in ("list", "summary"):
             params = self.request.query_params
-            qs = qs.annotate(revision_count_annotated=Count("revisions"))
+            if self.action == "list":
+                qs = qs.annotate(revision_count_annotated=Count("revisions"))
             # `state__in=draft,sent` lets the Quotations view list both
             # quotation states in one request.
             if params.get("state__in"):
@@ -45,6 +55,28 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
                 return qs.filter(active=False)
             return qs.filter(active=True)
         return qs
+
+    @action(detail=False)
+    def summary(self, request):
+        """Count and total per quotation status, for the Quotations page
+        analytics cards. Quotations past their validity date are counted
+        as "expired" instead of created/sent."""
+        qs = self.filter_queryset(self.get_queryset())
+        today = timezone.localdate()
+        expired = Q(state__in=("draft", "sent"), validity_date__lt=today)
+        buckets = {
+            "created": Q(state="draft") & ~expired,
+            "sent": Q(state="sent") & ~expired,
+            "accepted": Q(state__in=("sale", "done")),
+            "cancelled": Q(state="cancel"),
+            "expired": expired,
+            "all": Q(),
+        }
+        data = {}
+        for key, cond in buckets.items():
+            agg = qs.filter(cond).aggregate(count=Count("id"), total=Sum("amount_total"))
+            data[key] = {"count": agg["count"], "sum": agg["total"] or 0}
+        return Response(data)
 
     def _detail(self, order):
         return SaleOrderSerializer(order, context=self.get_serializer_context()).data
