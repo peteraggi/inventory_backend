@@ -1,6 +1,5 @@
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
-from rest_framework.pagination import PageNumberPagination
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -16,18 +15,11 @@ from inventory_apps.erp_sales.services import SalesService
 from inventory_core.pdf import render_pdf
 
 
-class SaleOrderPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = "page_size"
-    max_page_size = 100
-
-
 class SaleOrderViewSet(viewsets.ModelViewSet):
     queryset = SaleOrder.objects.all().select_related(
         "partner", "company", "currency", "payment_term", "warehouse"
     ).prefetch_related("lines__product")
     permission_classes = [IsAuthenticated]
-    pagination_class = SaleOrderPagination
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "partner__name", "client_order_ref"]
     filterset_fields = ["state", "partner", "revision_of"]
