@@ -51,6 +51,9 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
             # under their original quotation.
             if params.get("root_only") == "true":
                 qs = qs.filter(revision_of__isnull=True)
+            # `expired=true` — quotations past their validity date.
+            if params.get("expired") == "true":
+                qs = qs.filter(state__in=("draft", "sent"), validity_date__lt=timezone.localdate())
             if params.get("archived") == "true":
                 return qs.filter(active=False)
             return qs.filter(active=True)
