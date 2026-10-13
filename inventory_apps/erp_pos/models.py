@@ -225,15 +225,12 @@ class POSOrderLine(models.Model):
         ordering = ["id"]
 
     def save(self, *args, **kwargs):
-        base = self.price_unit * self.qty
-        disc = base * (self.discount / Decimal("100"))
-        self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
-        tax_total = Decimal("0.00")
-        if self.product_id and not self.tax_exempt:
-            for tax in self.product.taxes.filter(active=True):
-                tax_total += tax.compute_amount(self.price_subtotal)
-        self.price_tax = tax_total
-        self.price_subtotal_incl = self.price_subtotal + tax_total
+        from inventory_apps.erp_base.pricing import compute_line_amounts
+
+        taxes = self.product.taxes.filter(active=True) if (self.product_id and not self.tax_exempt) else []
+        self.price_subtotal, self.price_tax, self.price_subtotal_incl = compute_line_amounts(
+            self.price_unit, self.qty, self.discount, taxes,
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):

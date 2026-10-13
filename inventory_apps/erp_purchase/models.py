@@ -141,21 +141,25 @@ class PurchaseOrderLine(models.Model):
     def save(self, *args, **kwargs):
         if not self.product_uom_id and self.product_id:
             self.product_uom_id = self.product.product_template.uom_id
-        self.price_subtotal = (self.price_unit * self.product_qty).quantize(Decimal("0.01"))
+        if not self.pk:
+            # Provisional, tax-unaware subtotal — the line needs a PK before
+            # its `taxes` M2M can be set, so the real (possibly tax-included)
+            # totals are computed in compute_amount() right after that.
+            self.price_subtotal = (self.price_unit * self.product_qty).quantize(Decimal("0.01"))
         super().save(*args, **kwargs)
 
     def compute_amount(self):
-        """Recompute tax_amount/price_total from the (already-saved) taxes M2M.
-
-        Must be called after .taxes.set(...), since the line needs a PK
-        before the M2M relation can be queried.
+        """Recompute price_subtotal/tax_amount/price_total from the
+        (already-saved) taxes M2M — including peeling out any tax that's
+        included in the price. Must be called after .taxes.set(...), since
+        the line needs a PK before the M2M relation can be queried.
         """
-        tax_total = Decimal("0.00")
-        for tax in self.taxes.all():
-            tax_total += tax.compute_amount(self.price_subtotal)
-        self.tax_amount = tax_total
-        self.price_total = self.price_subtotal + tax_total
-        models.Model.save(self, update_fields=["tax_amount", "price_total"])
+        from inventory_apps.erp_base.pricing import compute_line_amounts
+
+        self.price_subtotal, self.tax_amount, self.price_total = compute_line_amounts(
+            self.price_unit, self.product_qty, Decimal("0.00"), self.taxes.all(),
+        )
+        models.Model.save(self, update_fields=["price_subtotal", "tax_amount", "price_total"])
 
     def __str__(self):
         return f"{self.product.name} x {self.product_qty}"

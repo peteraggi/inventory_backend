@@ -47,6 +47,32 @@ class SaleOrder(models.Model):
     note = models.TextField(blank=True)
     client_order_ref = models.CharField(max_length=100, blank=True)
 
+    # ── Quotation terms & conditions (OAS-style quotation builder) ──
+    # Printed in the "Terms & Conditions" block of the quotation preview/PDF.
+    # The *_words fields are the free-text sentences; the numeric fields are
+    # the structured values they describe.
+    delivery_days = models.PositiveIntegerField(null=True, blank=True)
+    delivery_words = models.CharField(max_length=255, blank=True)
+    validity_days = models.PositiveIntegerField(null=True, blank=True)
+    validity_words = models.CharField(max_length=255, blank=True)
+    payment_grace_days = models.PositiveIntegerField(null=True, blank=True)
+    payment_words = models.CharField(max_length=255, blank=True)
+    initial_payment_percentage = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_payment_percentage = models.PositiveSmallIntegerField(null=True, blank=True)
+    payment_method_words = models.CharField(max_length=255, blank=True)
+    bank_details = models.TextField(
+        blank=True,
+        help_text="Bank name, account name/number, branch, SWIFT — printed on the quotation.",
+    )
+
+    # ── Revisions ("variants" in OAS) ──
+    # A revision is a full copy of a quotation offered as an alternative; all
+    # revisions point at the original (root) quotation.
+    revision_of = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="revisions",
+    )
+    revision = models.PositiveIntegerField(default=1)
+
     # Totals (computed on save)
     amount_untaxed = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
     amount_tax = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
@@ -71,6 +97,10 @@ class SaleOrder(models.Model):
         if not self.name:
             from inventory_apps.erp_base.models import SequenceCounter
             self.name = SequenceCounter.next_sequence("SO")
+        if self.validity_days and not self.validity_date:
+            from datetime import timedelta
+            base = self.date_order or timezone.now()
+            self.validity_date = (base + timedelta(days=self.validity_days)).date()
         super().save(*args, **kwargs)
 
     def compute_totals(self):
@@ -153,18 +183,15 @@ class SaleOrderLine(models.Model):
         ordering = ["sequence", "id"]
 
     def save(self, *args, **kwargs):
+        from inventory_apps.erp_base.pricing import compute_line_amounts
+
         if not self.product_uom_id and self.product_id:
             self.product_uom_id = self.product.product_template.uom_id
-        base = self.price_unit * self.product_uom_qty
-        disc = base * (self.discount / Decimal("100"))
-        self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
-        # Tax computed from product's sale taxes
-        tax_total = Decimal("0.00")
-        if self.product_id:
-            for tax in self.product.taxes.filter(active=True):
-                tax_total += tax.compute_amount(self.price_subtotal)
-        self.tax_amount = tax_total
-        self.price_total = self.price_subtotal + tax_total
+        # Tax computed from the product's own sale taxes.
+        taxes = self.product.taxes.filter(active=True) if self.product_id else []
+        self.price_subtotal, self.tax_amount, self.price_total = compute_line_amounts(
+            self.price_unit, self.product_uom_qty, self.discount, taxes,
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):

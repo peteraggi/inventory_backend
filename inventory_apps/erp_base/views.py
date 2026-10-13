@@ -152,7 +152,7 @@ class ProductTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "internal_reference", "barcode"]
-    filterset_fields = ["product_type", "category", "can_be_sold", "can_be_purchased", "available_in_pos"]
+    filterset_fields = ["product_type", "category", "can_be_sold", "can_be_purchased", "available_in_pos", "is_favorite"]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -286,7 +286,9 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     queryset = (
         ProductVariant.objects.all()
         .select_related("product_template", "product_template__uom", "product_template__category")
-        .prefetch_related("attribute_values", "product_template__taxes")
+        .prefetch_related(
+            "attribute_values", "product_template__taxes", "product_template__supplier_taxes", "quants",
+        )
     )
     serializer_class = ProductVariantSerializer
     permission_classes = [IsAuthenticated]
