@@ -41,21 +41,33 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     state_display = serializers.CharField(source="get_state_display", read_only=True)
     payment_term_name = serializers.SerializerMethodField()
     billing_status = serializers.ReadOnlyField()
+    partner_email = serializers.CharField(source="partner.email", read_only=True, default="")
+    partner_phone = serializers.CharField(source="partner.phone", read_only=True, default="")
+    currency_name = serializers.CharField(source="currency.name", read_only=True, default="")
+    currency_code = serializers.CharField(source="currency.code", read_only=True, default="")
+    currency_symbol = serializers.CharField(source="currency.symbol", read_only=True, default="")
+    buyer_name = serializers.CharField(source="buyer.name", read_only=True, default="")
+    buyer_email = serializers.CharField(source="buyer.email", read_only=True, default="")
+    buyer_signature = serializers.ImageField(source="buyer.signature", read_only=True, default=None)
 
     class Meta:
         model = PurchaseOrder
         fields = [
             "id", "name", "partner", "partner_name", "partner_address_lines", "partner_ref",
+            "partner_email", "partner_phone",
             "state", "state_display",
             "date_order", "date_planned", "date_approve",
-            "payment_term", "payment_term_name", "currency", "notes", "origin",
+            "payment_term", "payment_term_name", "currency", "currency_name", "currency_code", "currency_symbol",
+            "notes", "origin",
+            "buyer", "buyer_name", "buyer_email", "buyer_signature",
+            "contact_person", "validity_days", "delivery_terms", "payment_method_words", "delivery_address",
             "amount_untaxed", "amount_tax", "amount_total",
             "receipt_count", "invoice_count", "billing_status", "active",
             "lines", "created_at", "updated_at",
         ]
         read_only_fields = [
             "name", "state", "amount_untaxed", "amount_tax", "amount_total",
-            "receipt_count", "invoice_count", "date_approve", "active",
+            "receipt_count", "invoice_count", "date_approve", "active", "buyer",
         ]
 
     def get_payment_term_name(self, obj):
@@ -88,10 +100,13 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 class PurchaseOrderListSerializer(serializers.ModelSerializer):
     partner_name = serializers.CharField(source="partner.name", read_only=True)
     state_display = serializers.CharField(source="get_state_display", read_only=True)
+    billing_status = serializers.ReadOnlyField()
+    buyer_name = serializers.CharField(source="buyer.name", read_only=True, default="")
 
     class Meta:
         model = PurchaseOrder
         fields = [
-            "id", "name", "partner_name", "state", "state_display",
-            "date_order", "amount_total", "receipt_count", "invoice_count",
+            "id", "name", "partner", "partner_name", "partner_ref", "state", "state_display",
+            "date_order", "date_planned", "amount_untaxed", "amount_tax", "amount_total",
+            "receipt_count", "invoice_count", "billing_status", "buyer_name",
         ]

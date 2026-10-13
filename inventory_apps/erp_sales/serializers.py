@@ -45,6 +45,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
     partner_email = serializers.CharField(source="partner.email", read_only=True, default="")
     partner_phone = serializers.CharField(source="partner.phone", read_only=True, default="")
     currency_name = serializers.CharField(source="currency.name", read_only=True, default="")
+    currency_code = serializers.CharField(source="currency.code", read_only=True, default="")
     currency_symbol = serializers.CharField(source="currency.symbol", read_only=True, default="")
     revision_of_name = serializers.CharField(source="revision_of.name", read_only=True, default="")
     revision_family = serializers.SerializerMethodField()
@@ -57,7 +58,7 @@ class SaleOrderSerializer(serializers.ModelSerializer):
             "state", "state_display",
             "date_order", "validity_date",
             "payment_term", "payment_term_name", "warehouse", "currency",
-            "currency_name", "currency_symbol",
+            "currency_name", "currency_code", "currency_symbol",
             "salesperson", "salesperson_name", "salesperson_email",
             "salesperson_phone", "salesperson_signature",
             "note", "client_order_ref",
