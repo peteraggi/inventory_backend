@@ -2,22 +2,50 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from inventory_apps.authentication.permissions import HasErpPermission
 from django_filters.rest_framework import DjangoFilterBackend
 
+from rest_framework.exceptions import PermissionDenied
+
 from inventory_apps.erp_base.models import Company
-from inventory_apps.erp_sales.models import SaleOrder, SaleOrderLine
+from inventory_core.exceptions import inventory_exception_handler
+from inventory_apps.erp_sales.models import SaleOrder
 from inventory_apps.erp_sales.serializers import (
-    SaleOrderSerializer, SaleOrderListSerializer, SaleOrderLineSerializer,
+    SaleOrderSerializer, SaleOrderListSerializer,
 )
 from inventory_apps.erp_sales.services import SalesService
 from inventory_core.pdf import render_pdf
 
 
-class SaleOrderViewSet(viewsets.ModelViewSet):
+class SalesErrorMixin:
+    """Every sales endpoint returns {"success": False, "error": "..."} on failure."""
+
+    def get_exception_handler(self):
+        return inventory_exception_handler
+
+
+class SaleOrderViewSet(SalesErrorMixin, viewsets.ModelViewSet):
+    """
+    Quotations and sales orders.
+
+    Workflow: send (quotation sent) -> confirm (raises the delivery) -> create-invoice.
+    cancel is refused once goods have left or the order is invoiced.
+    Lines are locked after confirmation.
+    """
     queryset = SaleOrder.objects.all().select_related(
         "partner", "company", "currency", "payment_term", "warehouse"
     ).prefetch_related("lines__product")
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermission]
+    erp_resource = "sales"
+    # Confirming, cancelling and archiving change the order, so they need update, not create.
+    erp_action_map = {
+        "send": "update",
+        "confirm": "update",
+        "cancel": "update",
+        "create_invoice": "update",
+        "archive": "update",
+        "unarchive": "update",
+    }
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "partner__name", "client_order_ref"]
     filterset_fields = ["state", "partner"]
@@ -43,35 +71,32 @@ class SaleOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
+        """Mark a quotation as sent to the customer."""
         order = self.get_object()
-        try:
-            order.action_send()
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        order.action_send()
         return Response(SaleOrderSerializer(order).data)
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
+        """Confirm the order and raise its delivery."""
         order = self.get_object()
-        try:
-            SalesService.confirm_sale_order(order)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        SalesService.confirm_sale_order(order)
         return Response(SaleOrderSerializer(order).data)
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
+        """Cancel the order and its open deliveries."""
         order = self.get_object()
-        order.action_cancel()
+        SalesService.cancel_sale_order(order)
         return Response(SaleOrderSerializer(order).data)
 
     @action(detail=True, methods=["post"], url_path="create-invoice")
     def create_invoice(self, request, pk=None):
+        """Invoice the quantities not yet invoiced. Needs accounting create access."""
+        if not request.user.has_erp_permission("accounting", "create"):
+            raise PermissionDenied("You need accounting access to create invoices.")
         order = self.get_object()
-        try:
-            move = SalesService.create_invoice_from_so(order)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        move = SalesService.create_invoice_from_so(order)
         from inventory_apps.erp_accounting.serializers import AccountMoveSerializer
         return Response(AccountMoveSerializer(move).data, status=status.HTTP_201_CREATED)
 

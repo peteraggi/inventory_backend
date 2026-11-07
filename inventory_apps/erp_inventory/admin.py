@@ -2,7 +2,8 @@ from django.contrib import admin
 from inventory_apps.erp_inventory.models import (
     Warehouse, StockLocation, StockPickingType, StockLot,
     StockPicking, StockMove, StockQuant,
-    StockInventoryAdjustment, StockInventoryAdjustmentLine, ReorderingRule,
+    StockInventoryAdjustment, StockInventoryAdjustmentLine, ReorderingRule, ScrapOrder,
+    StockLedgerEntry, InventoryCostLayer, InventoryNrvAdjustment,
 )
 
 admin.site.register(Warehouse)
@@ -15,3 +16,7 @@ admin.site.register(StockQuant)
 admin.site.register(StockInventoryAdjustment)
 admin.site.register(StockInventoryAdjustmentLine)
 admin.site.register(ReorderingRule)
+admin.site.register(ScrapOrder)
+admin.site.register(StockLedgerEntry)
+admin.site.register(InventoryCostLayer)
+admin.site.register(InventoryNrvAdjustment)

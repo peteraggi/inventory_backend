@@ -10,7 +10,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from .utils import Util
 from .models import User
 from .renderers import UserRenderer
-from .permissions import IsOwnerOrManager
+from .permissions import HasErpPermission
 from .serializers import (
     RegisterSerializer, SetNewPasswordSerializer,
     ResetPasswordEmailRequestSerializer, EmailVerificationSerializer,
@@ -19,7 +19,6 @@ from .serializers import (
     TeamMemberInviteSerializer, TeamMemberUpdateSerializer,
     ChangePasswordSerializer, MeSerializer,
 )
-from ..pos_app.permissions import IsOwner
 import random
 import string
 import logging
@@ -368,6 +367,12 @@ class LoginAPIView(generics.GenericAPIView):
         },
     )
     def post(self, request):
+        from inventory_apps.authentication.authentication import refuse_if_business_closed
+        from inventory_apps.authentication.ratelimit import enforce, client_ip
+        refuse_if_business_closed()
+        email = (request.data.get('email') or '').lower().strip()
+        enforce(f'signin:ip:{client_ip(request)}', limit=60, window_seconds=900)
+        enforce(f'signin:email:{email}', limit=10, window_seconds=900)
         serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         logger.debug(f'Login response data: {serializer.data}')
@@ -401,6 +406,9 @@ class RequestPasswordResetEmail(generics.GenericAPIView):
         },
     )
     def post(self, request):
+        from inventory_apps.authentication.ratelimit import enforce
+        email = (request.data.get('email') or '').lower().strip()
+        enforce(f'reset:email:{email}', limit=5, window_seconds=3600)
         try:
             serializer = self.serializer_class(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -586,42 +594,23 @@ class SetNewPasswordAPIView(generics.GenericAPIView):
         },
     )
     def patch(self, request):
-        try:
-            serializer = self.serializer_class(data=request.data)
-            serializer.is_valid(raise_exception=True)
-
-            uidb64 = request.data.get('uidb64')
-            user_id = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=user_id)
-
-            reset_session_key = f'reset_session_{user.pk}'
-            session_data = cache.get(reset_session_key)
-            if not session_data or not session_data.get('verified'):
-                return Response(
-                    {'error': 'Reset session expired. Please verify your code again.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            cache.delete(reset_session_key)
-            return Response({
-                'success': True,
-                'message': 'Password reset successful',
-                'user_id': str(user.id),
-                'email': user.email,
-            }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f'Error in password reset completion: {e}')
-            return Response(
-                {'error': 'Password reset failed. Please try again.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # The serializer checks the token and reset session, then sets the password.
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = User.objects.get(pk=force_str(urlsafe_base64_decode(serializer.validated_data['uidb64'])))
+        return Response({
+            'success': True,
+            'message': 'Password reset successful',
+            'user_id': str(user.id),
+            'email': user.email,
+        }, status=status.HTTP_200_OK)
 
 
 class TeamListView(generics.ListAPIView):
     """List staff members belonging to the current user's store."""
     serializer_class = TeamMemberSerializer
-    permission_classes = [IsOwnerOrManager]
+    permission_classes = [permissions.IsAuthenticated, HasErpPermission]
+    erp_resource = 'team'
 
     def get_queryset(self):
         return User.objects.filter(store=self.request.user.store).order_by('-created_at')
@@ -637,15 +626,16 @@ class TeamListView(generics.ListAPIView):
 
 
 class TeamInviteView(generics.GenericAPIView):
-    """Invite a new staff member into the current owner's store."""
+    """Invite a new staff member into the current owner's or manager's store."""
     serializer_class = TeamMemberInviteSerializer
-    permission_classes = [IsOwner]
+    permission_classes = [permissions.IsAuthenticated, HasErpPermission]
+    erp_resource = 'team'
 
     @swagger_auto_schema(
         tags=['Team'],
         operation_summary='Invite a staff member',
         operation_description=(
-            "Owner-only. Creates a new user scoped to the owner's store and emails them "
+            "Owner or manager. Creates a new user scoped to the store and emails them "
             'a 6-digit verification code (same flow as self-registration). The invitee '
             'completes setup via POST /auth/verify-email/, then sets their own password '
             'via PATCH /auth/change-password/.'
@@ -658,9 +648,11 @@ class TeamInviteView(generics.GenericAPIView):
         },
     )
     def post(self, request):
+        # Validation errors (wrong role, grants the inviter does not hold) are the caller's
+        # mistake and must come back as 400 with the reason, not be caught as a server error.
+        serializer = self.serializer_class(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
         try:
-            serializer = self.serializer_class(data=request.data, context={'request': request})
-            serializer.is_valid(raise_exception=True)
             user = serializer.save()
 
             verification_code = generate_token_code()
@@ -710,9 +702,10 @@ class TeamInviteView(generics.GenericAPIView):
 
 
 class TeamMemberUpdateView(generics.GenericAPIView):
-    """Update a staff member's role or active status."""
+    """Update a staff member's role, active status or individual permissions."""
     serializer_class = TeamMemberUpdateSerializer
-    permission_classes = [IsOwner]
+    permission_classes = [permissions.IsAuthenticated, HasErpPermission]
+    erp_resource = 'team'
 
     def get_object(self, pk):
         return User.objects.get(pk=pk, store=self.request.user.store)
@@ -732,8 +725,12 @@ class TeamMemberUpdateView(generics.GenericAPIView):
             user = self.get_object(pk)
         except User.DoesNotExist:
             return Response({'error': 'Staff member not found'}, status=status.HTTP_404_NOT_FOUND)
+        # Accounts whose role can change settings are only changed by someone who can change settings too.
+        from inventory_apps.authentication.rbac import role_grants
+        if user.role and role_grants(user.role, 'settings', 'update') and not request.user.has_erp_permission('settings', 'update'):
+            return Response({'error': 'Only someone who can change settings can change this account.'}, status=status.HTTP_403_FORBIDDEN)
 
-        serializer = self.serializer_class(user, data=request.data, partial=True)
+        serializer = self.serializer_class(user, data=request.data, partial=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(TeamMemberSerializer(user).data, status=status.HTTP_200_OK)

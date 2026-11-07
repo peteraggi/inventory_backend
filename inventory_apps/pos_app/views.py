@@ -1,6 +1,7 @@
 # pos_app/views.py
 
 from rest_framework import generics, status, views, permissions, filters
+from inventory_apps.authentication.permissions import HasErpPermission
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import ValidationError
@@ -88,14 +89,8 @@ from .serializers import (
     PaymentSerializer,
     StockMoveSerializer,
 )
-from .permissions import (
-    IsOwner,
-    IsOwnerOrReadOnly,
-    IsSameStore,
-    IsSalespersonOrOwner,
-    CanCreateInvoice,
-    CanViewReports,
-)
+from .permissions import HasLegacyResource, IsSameStore
+from inventory_apps.authentication.rbac import sees_all_records
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +126,7 @@ class StoreDetailView(generics.RetrieveAPIView):
 class RoleListView(generics.ListAPIView):
     queryset = Role.objects.all().order_by("name")
     serializer_class = RoleSerializer
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
 
     @swagger_auto_schema(tags=["Roles"], operation_summary="List all roles")
@@ -145,7 +140,9 @@ class RoleDetailView(generics.RetrieveUpdateAPIView):
     display_name aren't editable here, only description/permissions."""
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # Anyone signed in can read a role; only an owner can change what it allows.
+    permission_classes = [permissions.IsAuthenticated, HasErpPermission]
+    erp_resource = "settings"
 
     def get_serializer(self, *args, **kwargs):
         serializer = super().get_serializer(*args, **kwargs)
@@ -162,7 +159,8 @@ class RoleDetailView(generics.RetrieveUpdateAPIView):
 
 class CategoryListCreateView(generics.ListCreateAPIView):
     serializer_class = CategorySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "inventory"
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at"]
@@ -187,7 +185,8 @@ class CategoryListCreateView(generics.ListCreateAPIView):
 
 class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CategorySerializer
-    permission_classes = [permissions.IsAuthenticated, IsSameStore]
+    permission_classes = [permissions.IsAuthenticated, IsSameStore, HasLegacyResource]
+    legacy_resource = "inventory"
 
     @swagger_auto_schema(tags=["Categories"], operation_summary="Get category")
     def get(self, request, *args, **kwargs):
@@ -225,7 +224,8 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class ProductListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "inventory"
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -270,7 +270,8 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticated, IsSameStore]
+    permission_classes = [permissions.IsAuthenticated, IsSameStore, HasLegacyResource]
+    legacy_resource = "inventory"
 
     @swagger_auto_schema(tags=["Products"], operation_summary="Get product")
     def get(self, request, *args, **kwargs):
@@ -300,7 +301,8 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class LowStockProductsView(generics.ListAPIView):
     serializer_class = ProductListSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "inventory"
     pagination_class = None
 
     @swagger_auto_schema(tags=["Products"], operation_summary="List low-stock products")
@@ -322,7 +324,8 @@ class LowStockProductsView(generics.ListAPIView):
 
 
 class InvoiceListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated, CanCreateInvoice]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["sync_status"]
     ordering_fields = ["created_at", "total"]
@@ -357,7 +360,7 @@ class InvoiceListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = Invoice.objects.filter(store=user.store)
-        if user.role.name == "salesperson":
+        if not sees_all_records(user):
             queryset = queryset.filter(salesperson=user)
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
@@ -401,7 +404,8 @@ class InvoiceListCreateView(generics.ListCreateAPIView):
 
 class InvoiceDetailView(generics.RetrieveAPIView):
     serializer_class = InvoiceSerializer
-    permission_classes = [permissions.IsAuthenticated, IsSalespersonOrOwner]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
 
     @swagger_auto_schema(
         tags=["Invoices"],
@@ -414,7 +418,7 @@ class InvoiceDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         user = self.request.user
         queryset = Invoice.objects.filter(store=user.store)
-        if user.role.name == "salesperson":
+        if not sees_all_records(user):
             queryset = queryset.filter(salesperson=user)
         return queryset.select_related(
             "store", "salesperson", "salesperson__role"
@@ -423,7 +427,8 @@ class InvoiceDetailView(generics.RetrieveAPIView):
 
 class BulkInvoiceSyncView(generics.CreateAPIView):
     serializer_class = BulkInvoiceSyncSerializer
-    permission_classes = [permissions.IsAuthenticated, CanCreateInvoice]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
 
     @swagger_auto_schema(
         tags=["Invoices"],
@@ -474,7 +479,8 @@ class BulkInvoiceSyncView(generics.CreateAPIView):
 
 
 class DashboardStatsView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "reports"
 
     @swagger_auto_schema(
         tags=["Dashboard"],
@@ -554,7 +560,8 @@ class DashboardStatsView(views.APIView):
 
 
 class SalesReportView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "reports"
 
     @swagger_auto_schema(
         tags=["Reports"],
@@ -612,7 +619,8 @@ class SalesReportView(views.APIView):
 
 
 class ProductReportView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "reports"
 
     @swagger_auto_schema(
         tags=["Reports"],
@@ -673,7 +681,8 @@ class ProductReportView(views.APIView):
 
 
 class SyncStatusView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "pos"
 
     @swagger_auto_schema(
         tags=["Sync"],
@@ -724,7 +733,8 @@ class SyncStatusView(views.APIView):
 
 class SyncHistoryView(generics.ListAPIView):
     serializer_class = SyncLogSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "pos"
     pagination_class = None
 
     @swagger_auto_schema(tags=["Sync"], operation_summary="Get sync history")
@@ -770,7 +780,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
 
 class ContactListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "contacts"
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -796,7 +807,8 @@ class ContactListCreateView(generics.ListCreateAPIView):
 
 class ContactDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ContactSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "contacts"
 
     def get_queryset(self):
         return Contact.objects.filter(store=self.request.user.store)
@@ -813,7 +825,8 @@ class ContactDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class AccountListCreateView(generics.ListCreateAPIView):
     serializer_class = AccountSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     filterset_fields = ["account_type", "is_active"]
     search_fields = ["code", "name"]
@@ -827,7 +840,8 @@ class AccountListCreateView(generics.ListCreateAPIView):
 
 class AccountDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = AccountSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
 
     def get_queryset(self):
         return Account.objects.filter(store=self.request.user.store, is_system=False)
@@ -835,7 +849,8 @@ class AccountDetailView(generics.RetrieveUpdateAPIView):
 
 class JournalListView(generics.ListAPIView):
     serializer_class = JournalSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
 
     def get_queryset(self):
         return Journal.objects.filter(store=self.request.user.store)
@@ -843,7 +858,8 @@ class JournalListView(generics.ListAPIView):
 
 class JournalEntryListView(generics.ListAPIView):
     serializer_class = JournalEntrySerializer
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "reports"
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["status", "source_type"]
     ordering = ["-date"]
@@ -856,7 +872,8 @@ class JournalEntryListView(generics.ListAPIView):
 
 class JournalEntryDetailView(generics.RetrieveAPIView):
     serializer_class = JournalEntrySerializer
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "reports"
 
     def get_queryset(self):
         return JournalEntry.objects.filter(store=self.request.user.store)
@@ -868,7 +885,8 @@ class JournalEntryDetailView(generics.RetrieveAPIView):
 
 
 class PurchaseOrderListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -893,7 +911,8 @@ class PurchaseOrderListCreateView(generics.ListCreateAPIView):
 
 class PurchaseOrderDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = PurchaseOrderSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
 
     def get_queryset(self):
         return PurchaseOrder.objects.filter(store=self.request.user.store)
@@ -909,7 +928,9 @@ class PurchaseOrderDetailView(generics.RetrieveUpdateAPIView):
 
 
 class ConfirmPurchaseOrderView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -928,7 +949,8 @@ class ConfirmPurchaseOrderView(views.APIView):
 
 
 class GoodsReceiptListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["status", "purchase_order"]
     ordering = ["-received_date"]
@@ -948,14 +970,17 @@ class GoodsReceiptListCreateView(generics.ListCreateAPIView):
 
 class GoodsReceiptDetailView(generics.RetrieveAPIView):
     serializer_class = GoodsReceiptSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
 
     def get_queryset(self):
         return GoodsReceipt.objects.filter(store=self.request.user.store)
 
 
 class ValidateGoodsReceiptView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -971,10 +996,13 @@ class ValidateGoodsReceiptView(views.APIView):
             )
         except GoodsReceipt.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Goods receipt validation error: {e}", exc_info=True)
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -984,7 +1012,8 @@ class ValidateGoodsReceiptView(views.APIView):
 
 
 class VendorBillListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -1009,14 +1038,17 @@ class VendorBillListCreateView(generics.ListCreateAPIView):
 
 class VendorBillDetailView(generics.RetrieveAPIView):
     serializer_class = VendorBillSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
 
     def get_queryset(self):
         return VendorBill.objects.filter(store=self.request.user.store)
 
 
 class ConfirmVendorBillView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "purchases"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -1030,10 +1062,13 @@ class ConfirmVendorBillView(views.APIView):
             return Response({"status": "confirmed", "bill_number": bill.bill_number})
         except VendorBill.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Vendor bill confirmation error: {e}", exc_info=True)
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -1043,7 +1078,8 @@ class ConfirmVendorBillView(views.APIView):
 
 
 class SalesOrderListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -1068,7 +1104,8 @@ class SalesOrderListCreateView(generics.ListCreateAPIView):
 
 class SalesOrderDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = SalesOrderSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
 
     def get_queryset(self):
         return SalesOrder.objects.filter(store=self.request.user.store)
@@ -1084,7 +1121,9 @@ class SalesOrderDetailView(generics.RetrieveUpdateAPIView):
 
 
 class ConfirmSalesOrderView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -1103,7 +1142,8 @@ class ConfirmSalesOrderView(views.APIView):
 
 
 class DeliveryNoteListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["status", "sales_order"]
     ordering = ["-delivery_date"]
@@ -1123,14 +1163,17 @@ class DeliveryNoteListCreateView(generics.ListCreateAPIView):
 
 class DeliveryNoteDetailView(generics.RetrieveAPIView):
     serializer_class = DeliveryNoteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
 
     def get_queryset(self):
         return DeliveryNote.objects.filter(store=self.request.user.store)
 
 
 class ValidateDeliveryNoteView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -1146,10 +1189,13 @@ class ValidateDeliveryNoteView(views.APIView):
             )
         except DeliveryNote.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Delivery note validation error: {e}", exc_info=True)
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -1159,7 +1205,8 @@ class ValidateDeliveryNoteView(views.APIView):
 
 
 class SalesInvoiceListCreateView(generics.ListCreateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
@@ -1184,14 +1231,17 @@ class SalesInvoiceListCreateView(generics.ListCreateAPIView):
 
 class SalesInvoiceDetailView(generics.RetrieveAPIView):
     serializer_class = SalesInvoiceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
 
     def get_queryset(self):
         return SalesInvoice.objects.filter(store=self.request.user.store)
 
 
 class PostSalesInvoiceView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "sales"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -1207,10 +1257,13 @@ class PostSalesInvoiceView(views.APIView):
             )
         except SalesInvoice.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Sales invoice post error: {e}", exc_info=True)
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -1221,7 +1274,8 @@ class PostSalesInvoiceView(views.APIView):
 
 class PaymentListCreateView(generics.ListCreateAPIView):
     serializer_class = PaymentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["payment_type", "status", "payment_method"]
     ordering = ["-date"]
@@ -1234,14 +1288,17 @@ class PaymentListCreateView(generics.ListCreateAPIView):
 
 class PaymentDetailView(generics.RetrieveAPIView):
     serializer_class = PaymentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
 
     def get_queryset(self):
         return Payment.objects.filter(store=self.request.user.store)
 
 
 class ConfirmPaymentView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
+    legacy_action = "update"
 
     def post(self, request, pk):
         try:
@@ -1257,10 +1314,13 @@ class ConfirmPaymentView(views.APIView):
             )
         except Payment.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Payment confirmation error: {e}", exc_info=True)
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -1271,7 +1331,8 @@ class ConfirmPaymentView(views.APIView):
 
 class StockMoveListView(generics.ListAPIView):
     serializer_class = StockMoveSerializer
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "inventory"
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["move_type", "product"]
     ordering = ["-date"]
@@ -1283,7 +1344,8 @@ class StockMoveListView(generics.ListAPIView):
 
 
 class TrialBalanceView(views.APIView):
-    permission_classes = [permissions.IsAuthenticated, CanViewReports]
+    permission_classes = [permissions.IsAuthenticated, HasLegacyResource]
+    legacy_resource = "accounting"
 
     def get(self, request):
         from django.db.models import Sum as DSum

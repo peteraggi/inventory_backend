@@ -2,14 +2,18 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from inventory_apps.authentication.permissions import HasErpPermission
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.contenttypes.models import ContentType
 
+from rest_framework.exceptions import PermissionDenied
+
 from inventory_apps.erp_base.models import ActivityLog, Company
+from inventory_core.exceptions import inventory_exception_handler
 from inventory_apps.erp_base.serializers import ActivityLogSerializer
-from inventory_apps.erp_purchase.models import PurchaseOrder, PurchaseOrderLine
+from inventory_apps.erp_purchase.models import PurchaseOrder
 from inventory_apps.erp_purchase.serializers import (
-    PurchaseOrderSerializer, PurchaseOrderListSerializer, PurchaseOrderLineSerializer,
+    PurchaseOrderSerializer, PurchaseOrderListSerializer,
 )
 from inventory_apps.erp_purchase.services import PurchaseService
 from inventory_core.pdf import render_pdf
@@ -24,11 +28,35 @@ PO_TRACKED_FIELDS = {
 }
 
 
-class PurchaseOrderViewSet(viewsets.ModelViewSet):
+class PurchaseErrorMixin:
+    """Every purchasing endpoint returns {"success": False, "error": "..."} on failure."""
+
+    def get_exception_handler(self):
+        return inventory_exception_handler
+
+
+class PurchaseOrderViewSet(PurchaseErrorMixin, viewsets.ModelViewSet):
+    """
+    Requests for quotation and purchase orders.
+
+    Workflow: send (RFQ sent) -> confirm (raises the receipt) -> create-bill.
+    cancel is refused once goods have arrived or the order is billed.
+    Lines are locked after confirmation.
+    """
     queryset = PurchaseOrder.objects.all().select_related(
         "partner", "company", "currency", "payment_term"
     ).prefetch_related("lines__product", "lines__taxes")
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermission]
+    erp_resource = "purchases"
+    # Confirming, cancelling and archiving change the order, so they need update, not create.
+    erp_action_map = {
+        "send": "update",
+        "confirm": "update",
+        "cancel": "update",
+        "create_bill": "update",
+        "archive": "update",
+        "unarchive": "update",
+    }
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "partner__name", "origin"]
     filterset_fields = ["state", "partner"]
@@ -104,38 +132,34 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
+        """Mark an RFQ as sent to the vendor."""
         order = self.get_object()
-        try:
-            order.action_send()
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        order.action_send()
         self._log(order, "Request for Quotation sent to vendor", message_type="note")
         return Response(PurchaseOrderSerializer(order).data)
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
+        """Confirm the RFQ into a purchase order and raise its receipt."""
         order = self.get_object()
-        try:
-            PurchaseService.confirm_purchase_order(order)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        PurchaseService.confirm_purchase_order(order)
         self._log(order, "Purchase order confirmed", message_type="note")
         return Response(PurchaseOrderSerializer(order).data)
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         order = self.get_object()
-        order.action_cancel()
+        PurchaseService.cancel_purchase_order(order)
         self._log(order, "Order cancelled", message_type="note")
         return Response(PurchaseOrderSerializer(order).data)
 
     @action(detail=True, methods=["post"], url_path="create-bill")
     def create_bill(self, request, pk=None):
+        """Bill the quantities not yet billed. Needs accounting create access."""
+        if not request.user.has_erp_permission("accounting", "create"):
+            raise PermissionDenied("You need accounting access to create vendor bills.")
         order = self.get_object()
-        try:
-            move = PurchaseService.create_bill_from_po(order)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        move = PurchaseService.create_bill_from_po(order)
         self._log(order, f"Bill {move.name} created", message_type="note")
         from inventory_apps.erp_accounting.serializers import AccountMoveSerializer
         return Response(AccountMoveSerializer(move).data, status=status.HTTP_201_CREATED)

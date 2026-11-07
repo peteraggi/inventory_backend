@@ -2,7 +2,31 @@ from rest_framework import serializers
 from inventory_apps.erp_sales.models import SaleOrder, SaleOrderLine
 
 
-class SaleOrderLineSerializer(serializers.ModelSerializer):
+class OrderLineValidationMixin:
+    """Quantities must be positive, prices and discounts must be sensible."""
+
+    def validate_product_uom_qty(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than zero.")
+        return value
+
+    def validate_product_qty(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than zero.")
+        return value
+
+    def validate_price_unit(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Price cannot be negative.")
+        return value
+
+    def validate_discount(self, value):
+        if value < 0 or value > 100:
+            raise serializers.ValidationError("Discount must be between 0 and 100 percent.")
+        return value
+
+
+class SaleOrderLineSerializer(OrderLineValidationMixin, serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_uom_name = serializers.CharField(source="product_uom.name", read_only=True, default="")
     tax_names = serializers.SerializerMethodField()
@@ -68,6 +92,14 @@ class SaleOrderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         lines_data = validated_data.pop("lines", None)
+        if lines_data is not None and instance.state not in ("draft", "sent"):
+            raise serializers.ValidationError(
+                {"lines": "Lines can only be changed while the order is a quotation."}
+            )
+        if "note" in validated_data and validated_data["note"] != instance.note and instance.state not in ("draft", "sent"):
+            raise serializers.ValidationError(
+                {"note": "Terms can only be changed while the order is a quotation."}
+            )
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

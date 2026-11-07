@@ -65,6 +65,10 @@ class AccountAccount(models.Model):
         default=False, help_text="Allow reconciliation (for AR/AP accounts)",
     )
     deprecated = models.BooleanField(default=False)
+    is_tax_account = models.BooleanField(
+        default=False,
+        help_text="Tax is posted only to accounts flagged here, never inferred from the account type",
+    )
     active = models.BooleanField(default=True)
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -315,7 +319,10 @@ class AccountMoveLine(models.Model):
         ordering = ["sequence", "id"]
 
     def save(self, *args, **kwargs):
-        if self.product_id and not self.exclude_from_invoice_tab:
+        if not self.exclude_from_invoice_tab and not self.pk:
+            # Provisional, tax-unaware subtotal — the line needs a PK before
+            # its `taxes` M2M can be set, so the real (possibly tax-included)
+            # totals are computed in compute_amount() right after that.
             base = self.price_unit * self.quantity
             disc = base * (self.discount / Decimal("100"))
             self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
@@ -323,13 +330,16 @@ class AccountMoveLine(models.Model):
         super().save(*args, **kwargs)
 
     def compute_amount(self):
-        """Recompute tax_amount/price_total from the `taxes` M2M (must be
-        called after .taxes.set(...), since the line needs a PK first).
+        """Recompute price_subtotal/tax_amount/price_total from the `taxes`
+        M2M (must be called after .taxes.set(...), since the line needs a PK
+        first) — including peeling out any tax that's included in the price.
         Falls back to the product's own default taxes when the line has none
         explicitly set — e.g. bills/invoices created directly rather than
         from a purchase/sale order line that already had taxes chosen.
         """
-        if not self.product_id or self.exclude_from_invoice_tab:
+        from inventory_apps.erp_base.pricing import compute_line_amounts
+
+        if self.exclude_from_invoice_tab:
             return
         taxes = list(self.taxes.all())
         if not taxes and self.product_id:
@@ -337,10 +347,10 @@ class AccountMoveLine(models.Model):
                 taxes = list(self.product.taxes.filter(active=True))
             else:
                 taxes = list(self.product.supplier_taxes.filter(active=True))
-        tax_total = sum((t.compute_amount(self.price_subtotal) for t in taxes), Decimal("0.00"))
-        self.tax_amount = tax_total
-        self.price_total = self.price_subtotal + tax_total
-        models.Model.save(self, update_fields=["tax_amount", "price_total"])
+        self.price_subtotal, self.tax_amount, self.price_total = compute_line_amounts(
+            self.price_unit, self.quantity, self.discount, taxes,
+        )
+        models.Model.save(self, update_fields=["price_subtotal", "tax_amount", "price_total"])
 
     def __str__(self):
         return f"{self.account.code} Dr:{self.debit} Cr:{self.credit}"

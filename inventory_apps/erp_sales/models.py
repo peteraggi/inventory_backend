@@ -84,31 +84,20 @@ class SaleOrder(models.Model):
         self.amount_total = untaxed + tax_total
         self.save(update_fields=["amount_untaxed", "amount_tax", "amount_total"])
 
-    def action_confirm(self):
-        from inventory_apps.erp_sales.services import SalesService
-        SalesService.confirm_sale_order(self)
-
-    def action_cancel(self):
-        if self.state not in ("done",):
-            self.state = "cancel"
-            self.save(update_fields=["state"])
-
     def action_send(self):
+        from inventory_apps.erp_sales.exceptions import OrderStateError
         if self.state != "draft":
-            raise ValueError(f"Cannot send quotation in state '{self.state}'")
+            raise OrderStateError(f"Cannot send quotation in state '{self.state}'")
         self.state = "sent"
         self.save(update_fields=["state"])
 
     @property
     def invoice_status(self):
-        lines = self.lines.all()
-        if not lines.exists():
+        lines = list(self.lines.all())
+        if not lines:
             return "nothing_to_invoice"
-        invoiced = all(line.qty_invoiced >= line.product_uom_qty for line in lines)
-        if invoiced:
+        if all(line.qty_invoiced >= line.product_uom_qty for line in lines):
             return "invoiced"
-        if any(line.qty_invoiced > 0 for line in lines):
-            return "to_invoice"
         return "to_invoice"
 
 
@@ -153,18 +142,15 @@ class SaleOrderLine(models.Model):
         ordering = ["sequence", "id"]
 
     def save(self, *args, **kwargs):
+        from inventory_apps.erp_base.pricing import compute_line_amounts
+
         if not self.product_uom_id and self.product_id:
             self.product_uom_id = self.product.product_template.uom_id
-        base = self.price_unit * self.product_uom_qty
-        disc = base * (self.discount / Decimal("100"))
-        self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
-        # Tax computed from product's sale taxes
-        tax_total = Decimal("0.00")
-        if self.product_id:
-            for tax in self.product.taxes.filter(active=True):
-                tax_total += tax.compute_amount(self.price_subtotal)
-        self.tax_amount = tax_total
-        self.price_total = self.price_subtotal + tax_total
+        # Tax computed from the product's own sale taxes.
+        taxes = self.product.taxes.filter(active=True) if self.product_id else []
+        self.price_subtotal, self.tax_amount, self.price_total = compute_line_amounts(
+            self.price_unit, self.product_uom_qty, self.discount, taxes,
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):

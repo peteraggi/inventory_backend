@@ -116,6 +116,8 @@ class RegisterSerializer(serializers.ModelSerializer):
                 store=validated_data['store'],
                 role=validated_data['role']
             )
+            from inventory_apps.clients.workspaces import link_user
+            link_user(user, store_id=validated_data['store'].id, role_id=validated_data['role'].id)
             return user
         except Exception as e:
             raise serializers.ValidationError(f'Failed to create user: {str(e)}')
@@ -350,7 +352,7 @@ class SetNewPasswordSerializer(serializers.Serializer):
 
             # Set new password
             user.set_password(password)
-            user.save()
+            user.save(skip_validation=True, update_fields=['password'])
 
             # Clear reset session
             cache.delete(reset_session_key)
@@ -368,26 +370,128 @@ class TeamMemberSerializer(serializers.ModelSerializer):
     role_id = serializers.UUIDField(read_only=True)
     role_name = serializers.CharField(source='role.display_name', read_only=True)
     store_id = serializers.UUIDField(read_only=True)
+    roles = serializers.SerializerMethodField()
+    additional_role_ids = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
+    permission_overrides = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'name', 'email', 'phone',
             'role_id', 'role_name', 'store_id',
+            'roles', 'additional_role_ids',
             'is_active', 'is_verified', 'created_at',
+            'permission_overrides',
         ]
         read_only_fields = fields
 
+    def get_additional_role_ids(self, obj):
+        from inventory_apps.authentication.rbac import extra_role_assignments
+        return [str(a.role_id) for a in extra_role_assignments(obj)]
+
+    def get_roles(self, obj):
+        from inventory_apps.authentication.rbac import active_roles
+        return [
+            {'id': str(role.id), 'name': role.name, 'display_name': role.display_name}
+            for role in active_roles(obj)
+        ]
+
+    def get_permission_overrides(self, obj):
+        from inventory_apps.clients.workspaces import membership_for_current
+        membership = membership_for_current(obj)
+        return membership.permission_overrides if membership else obj.permission_overrides
+
+    def get_is_active(self, obj):
+        from inventory_apps.clients.workspaces import membership_for_current
+        membership = membership_for_current(obj)
+        return membership.is_active if membership else obj.is_active
+
+
+def _check_team_grants(request, grants):
+    """Managers may only grant what they hold themselves; owners hold everything."""
+    from inventory_apps.authentication.rbac import grants_within, validate_matrix
+    problems = validate_matrix(grants)
+    if problems:
+        raise serializers.ValidationError(problems)
+    missing = grants_within(request.user, grants)
+    if missing:
+        raise serializers.ValidationError(
+            f"You cannot grant permissions you do not hold: {', '.join(missing)}."
+        )
+
+
+def _check_owner_role(request, role):
+    """Assigning a role gives its permissions, so the assigner must hold all of them."""
+    from inventory_apps.authentication.rbac import role_grants_within
+    # Roles that can change settings are refused unless the assigner holds settings update too.
+    missing = role_grants_within(request.user, role)
+    if missing:
+        raise serializers.ValidationError(
+            f"You cannot assign the {role.display_name} role: it includes permissions you do not hold."
+        )
+
+
+def _validate_additional_roles(request, role_ids, primary_id=None):
+    """Each extra role must exist, be assignable by the requester, and not repeat the primary role."""
+    roles = []
+    for role_id in dict.fromkeys(role_ids):
+        if str(role_id) == str(primary_id):
+            continue
+        role = Role.objects.filter(id=role_id).first()
+        if role is None:
+            raise serializers.ValidationError(f'Invalid role ID: {role_id}.')
+        _check_owner_role(request, role)
+        roles.append(role)
+    return roles
+
+
+def _sync_additional_roles(user, roles, assigned_by):
+    """
+    Make the user's extra roles in this business exactly `roles`. Removed roles are revoked,
+    not deleted, so the history of who held what is kept.
+    """
+    from django.utils import timezone
+    from inventory_apps.authentication.models import UserRole
+    from inventory_apps.authentication.rbac import extra_role_assignments
+    from inventory_apps.clients.workspaces import current_client
+
+    client = current_client()
+    workspace_id = client.pk if client else None
+    wanted = {role.id for role in roles}
+    current = extra_role_assignments(user)
+    for assignment in current:
+        if assignment.role_id not in wanted:
+            assignment.unassigned_at = timezone.now()
+            assignment.save(update_fields=['unassigned_at'])
+    held = {assignment.role_id for assignment in current if assignment.unassigned_at is None}
+    for role in roles:
+        if role.id not in held:
+            UserRole.objects.create(
+                user=user, role=role, assigned_by=assigned_by, workspace_id=workspace_id,
+            )
+
 
 class TeamMemberInviteSerializer(serializers.Serializer):
-    """Serializer for an owner inviting a new staff member into their store."""
+    """Serializer for an owner or manager inviting a new staff member into their store."""
     name = serializers.CharField()
     email = serializers.EmailField()
     phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     role_id = serializers.UUIDField()
+    additional_role_ids = serializers.ListField(child=serializers.UUIDField(), required=False, default=list)
+    permission_overrides = serializers.JSONField(required=False, default=dict)
 
     class Meta:
-        fields = ['name', 'email', 'phone', 'role_id']
+        fields = ['name', 'email', 'phone', 'role_id', 'additional_role_ids', 'permission_overrides']
+
+    def validate_additional_role_ids(self, value):
+        self._extra_roles = _validate_additional_roles(self.context['request'], value, self.initial_data.get('role_id'))
+        return value
+
+    def validate_permission_overrides(self, value):
+        from inventory_apps.authentication.rbac import only_true
+        _check_team_grants(self.context['request'], value)
+        return only_true(value)
 
     def validate_name(self, value):
         if not value or not value.strip():
@@ -401,8 +505,10 @@ class TeamMemberInviteSerializer(serializers.Serializer):
         return email
 
     def validate_role_id(self, value):
-        if not Role.objects.filter(id=value).exists():
+        role = Role.objects.filter(id=value).first()
+        if role is None:
             raise serializers.ValidationError('Invalid role ID.')
+        _check_owner_role(self.context['request'], role)
         return value
 
     def create(self, validated_data):
@@ -416,28 +522,57 @@ class TeamMemberInviteSerializer(serializers.Serializer):
             store=request.user.store,
             role=role,
         )
+        from inventory_apps.clients.workspaces import link_user
+        link_user(
+            user,
+            store_id=request.user.store_id,
+            role_id=role.id,
+            permission_overrides=validated_data.get('permission_overrides', {}),
+        )
+        _sync_additional_roles(user, getattr(self, '_extra_roles', []), request.user)
         return user
 
 
 class TeamMemberUpdateSerializer(serializers.Serializer):
-    """Serializer for an owner updating a staff member's role or active status."""
+    """Serializer for an owner or manager updating a staff member's roles, status or permissions."""
     role_id = serializers.UUIDField(required=False)
+    additional_role_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
     is_active = serializers.BooleanField(required=False)
+    permission_overrides = serializers.JSONField(required=False)
 
     class Meta:
-        fields = ['role_id', 'is_active']
+        fields = ['role_id', 'additional_role_ids', 'is_active', 'permission_overrides']
 
-    def validate_role_id(self, value):
-        if not Role.objects.filter(id=value).exists():
-            raise serializers.ValidationError('Invalid role ID.')
+    def validate_additional_role_ids(self, value):
+        primary = self.initial_data.get('role_id') or (self.instance.role_id if self.instance else None)
+        self._extra_roles = _validate_additional_roles(self.context['request'], value, primary)
         return value
 
+    def validate_role_id(self, value):
+        role = Role.objects.filter(id=value).first()
+        if role is None:
+            raise serializers.ValidationError('Invalid role ID.')
+        _check_owner_role(self.context['request'], role)
+        return value
+
+    def validate_permission_overrides(self, value):
+        from inventory_apps.authentication.rbac import only_true
+        _check_team_grants(self.context['request'], value)
+        return only_true(value)
+
     def update(self, instance, validated_data):
+        from inventory_apps.clients.workspaces import membership_for_current
+        # Role, status and grants are per business: they live on this business's membership.
+        membership = membership_for_current(instance)
         if 'role_id' in validated_data:
-            instance.role = Role.objects.get(id=validated_data['role_id'])
+            membership.role_id = validated_data['role_id']
         if 'is_active' in validated_data:
-            instance.is_active = validated_data['is_active']
-        instance.save(skip_validation=True)
+            membership.is_active = validated_data['is_active']
+        if 'permission_overrides' in validated_data:
+            membership.permission_overrides = validated_data['permission_overrides']
+        membership.save()
+        if 'additional_role_ids' in validated_data:
+            _sync_additional_roles(instance, self._extra_roles, self.context['request'].user)
         return instance
 
 
@@ -447,20 +582,26 @@ class MeSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(source='store.name', read_only=True)
     role_key = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'name', 'email', 'phone', 'bio', 'signature',
-            'role_name', 'role_key', 'permissions', 'store_name', 'created_at',
+            'role_name', 'role_key', 'roles', 'permissions', 'store_name', 'created_at',
         ]
-        read_only_fields = ['id', 'email', 'role_name', 'role_key', 'permissions', 'store_name', 'created_at']
+        read_only_fields = ['id', 'email', 'role_name', 'role_key', 'roles', 'permissions', 'store_name', 'created_at']
+
+    def get_roles(self, obj):
+        from inventory_apps.authentication.rbac import active_roles
+        return [{'id': str(r.id), 'name': r.name, 'display_name': r.display_name} for r in active_roles(obj)]
 
     def get_role_key(self, obj):
         return obj.role.name if obj.role_id else ""
 
     def get_permissions(self, obj):
-        return obj.role.permissions if obj.role_id else {}
+        from inventory_apps.authentication.rbac import effective_matrix
+        return effective_matrix(obj)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

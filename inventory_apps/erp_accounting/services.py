@@ -1,11 +1,18 @@
 """
 erp_accounting/services.py — AccountingService: post journal entries, register payments,
 reconcile, compute trial balance.
-All posted moves must satisfy sum(debit) == sum(credit).
+
+Every posted move satisfies sum(debit) == sum(credit). A document that cannot be
+balanced because an account is missing is refused, never posted half-built.
 """
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
+
+from inventory_apps.erp_accounting.exceptions import (
+    AccountSetupError, EmptyDocumentError, InvalidStateError,
+    PaymentError, PostedDocumentError, UnbalancedEntryError,
+)
 
 
 class AccountingService:
@@ -13,22 +20,26 @@ class AccountingService:
     @classmethod
     @transaction.atomic
     def post_move(cls, move):
-        """Post a journal entry / invoice. Validates double-entry balance for journal entries."""
-        from inventory_apps.erp_accounting.models import AccountMove, AccountMoveLine, AccountAccount
-
+        """Post a journal entry or invoice. Refuses empty or unbalanced entries."""
         if move.state == "posted":
-            raise ValueError("Move is already posted")
+            raise InvalidStateError("Move is already posted")
+        if move.state == "cancel":
+            raise InvalidStateError("A cancelled document cannot be posted")
 
         if move.move_type == "entry":
-            # Pure journal entry: must balance
-            lines = move.lines.all()
+            # Pure journal entry: must have lines and must balance
+            lines = list(move.lines.all())
+            if not lines:
+                raise EmptyDocumentError()
             total_debit = sum(l.debit for l in lines) or Decimal("0.00")
             total_credit = sum(l.credit for l in lines) or Decimal("0.00")
             if abs(total_debit - total_credit) > Decimal("0.01"):
-                raise ValueError(
+                raise UnbalancedEntryError(
                     f"Journal entry does not balance: debit={total_debit}, credit={total_credit}"
                 )
         else:
+            if not move.lines.exists():
+                raise EmptyDocumentError()
             # Invoice/Bill: build accounting lines automatically
             cls._generate_accounting_lines(move)
 
@@ -63,9 +74,9 @@ class AccountingService:
         invoice-tab lines.
         """
         if move.move_type == "entry":
-            raise ValueError("Journal entries don't have generated accounting lines to recompute")
+            raise InvalidStateError("Journal entries don't have generated accounting lines to recompute")
         if move.state != "posted":
-            raise ValueError("Only posted invoices/bills have journal items to recompute")
+            raise InvalidStateError("Only posted invoices/bills have journal items to recompute")
         cls._generate_accounting_lines(move)
         move.compute_totals()
         return move
@@ -126,21 +137,25 @@ class AccountingService:
         counterpart_account = AccountAccount.objects.filter(
             account_type=counterpart_type, active=True
         ).first()
-        if counterpart_account:
-            if is_customer_side != is_reversal:
-                cp_debit, cp_credit = total, Decimal("0.00")
-            else:
-                cp_debit, cp_credit = Decimal("0.00"), total
-            AccountMoveLine.objects.create(
-                move=move,
-                account=counterpart_account,
-                partner=move.partner,
-                name=f"Counterpart: {move.partner.name if move.partner else ''}",
-                debit=cp_debit,
-                credit=cp_credit,
-                exclude_from_invoice_tab=True,
-                date_maturity=move.invoice_date_due,
+        if counterpart_account is None:
+            raise AccountSetupError(
+                f"No {'receivable' if is_customer_side else 'payable'} account is configured. "
+                "Add one in the chart of accounts before posting."
             )
+        if is_customer_side != is_reversal:
+            cp_debit, cp_credit = total, Decimal("0.00")
+        else:
+            cp_debit, cp_credit = Decimal("0.00"), total
+        AccountMoveLine.objects.create(
+            move=move,
+            account=counterpart_account,
+            partner=move.partner,
+            name=f"Counterpart: {move.partner.name if move.partner else ''}",
+            debit=cp_debit,
+            credit=cp_credit,
+            exclude_from_invoice_tab=True,
+            date_maturity=move.invoice_date_due,
+        )
 
         # 2. Aggregated tax line: VAT Payable for sales, input VAT (receivable)
         #    for purchases — best-effort lookup by account type, since we don't
@@ -148,21 +163,25 @@ class AccountingService:
         if tax_total != Decimal("0.00"):
             tax_account_type = "liability_current" if is_customer_side else "asset_current"
             tax_account = AccountAccount.objects.filter(
-                account_type=tax_account_type, active=True
+                account_type=tax_account_type, is_tax_account=True, active=True
             ).first()
-            if tax_account:
-                if is_customer_side == is_reversal:
-                    tax_debit, tax_credit = tax_total, Decimal("0.00")
-                else:
-                    tax_debit, tax_credit = Decimal("0.00"), tax_total
-                AccountMoveLine.objects.create(
-                    move=move,
-                    account=tax_account,
-                    name="Tax",
-                    debit=tax_debit,
-                    credit=tax_credit,
-                    exclude_from_invoice_tab=True,
+            if tax_account is None:
+                raise AccountSetupError(
+                    "Tax was charged but no tax account is set up. Flag an account as a tax "
+                    "account in the chart of accounts."
                 )
+            if is_customer_side == is_reversal:
+                tax_debit, tax_credit = tax_total, Decimal("0.00")
+            else:
+                tax_debit, tax_credit = Decimal("0.00"), tax_total
+            AccountMoveLine.objects.create(
+                move=move,
+                account=tax_account,
+                name="Tax",
+                debit=tax_debit,
+                credit=tax_credit,
+                exclude_from_invoice_tab=True,
+            )
 
     @classmethod
     @transaction.atomic
@@ -171,7 +190,12 @@ class AccountingService:
         from inventory_apps.erp_accounting.models import AccountPayment, AccountMove, AccountMoveLine, AccountAccount
 
         if move.state != "posted":
-            raise ValueError("Can only pay posted invoices")
+            raise InvalidStateError("Can only pay posted invoices")
+        if amount is None or amount <= Decimal("0.00"):
+            raise PaymentError("Payment amount must be greater than zero.")
+        residual = move.amount_total - (move.amount_paid or Decimal("0.00"))
+        if amount > residual:
+            raise PaymentError(f"Payment of {amount} is more than the {residual} still due.")
 
         payment_type = "inbound" if move.move_type in ("out_invoice",) else "outbound"
         partner_type = "customer" if move.move_type in ("out_invoice",) else "supplier"
@@ -200,29 +224,32 @@ class AccountingService:
             ).first()
             credit_account = journal.default_account
 
-        if debit_account and credit_account:
-            pay_move = AccountMove.objects.create(
-                move_type="entry",
-                journal=journal,
-                partner=move.partner,
-                date=payment.date,
-                narration=memo,
-                state="draft",
+        if debit_account is None or credit_account is None:
+            raise AccountSetupError(
+                "The journal or receivable/payable account for this payment is not configured."
             )
-            AccountMoveLine.objects.create(
-                move=pay_move, account=debit_account, partner=move.partner,
-                debit=amount, credit=Decimal("0.00"),
-                name=f"Payment: {move.name}", exclude_from_invoice_tab=True,
-            )
-            AccountMoveLine.objects.create(
-                move=pay_move, account=credit_account, partner=move.partner,
-                debit=Decimal("0.00"), credit=amount,
-                name=f"Payment: {move.name}", exclude_from_invoice_tab=True,
-            )
-            pay_move.state = "posted"
-            pay_move.save(update_fields=["state"])
-            payment.move = pay_move
-            payment.save(update_fields=["move"])
+        pay_move = AccountMove.objects.create(
+            move_type="entry",
+            journal=journal,
+            partner=move.partner,
+            date=payment.date,
+            narration=memo,
+            state="draft",
+        )
+        AccountMoveLine.objects.create(
+            move=pay_move, account=debit_account, partner=move.partner,
+            debit=amount, credit=Decimal("0.00"),
+            name=f"Payment: {move.name}", exclude_from_invoice_tab=True,
+        )
+        AccountMoveLine.objects.create(
+            move=pay_move, account=credit_account, partner=move.partner,
+            debit=Decimal("0.00"), credit=amount,
+            name=f"Payment: {move.name}", exclude_from_invoice_tab=True,
+        )
+        pay_move.state = "posted"
+        pay_move.save(update_fields=["state"])
+        payment.move = pay_move
+        payment.save(update_fields=["move"])
 
         # Update invoice paid amount
         move.amount_paid = (move.amount_paid or Decimal("0.00")) + amount
@@ -238,9 +265,8 @@ class AccountingService:
 
     @classmethod
     def post_payment(cls, payment):
-        from inventory_apps.erp_accounting.models import AccountMove, AccountMoveLine, AccountAccount
         if payment.state != "draft":
-            raise ValueError("Payment already posted")
+            raise PostedDocumentError("Payment already posted")
         payment.state = "posted"
         if not payment.name:
             from inventory_apps.erp_base.models import SequenceCounter
@@ -251,14 +277,15 @@ class AccountingService:
 
     @classmethod
     def get_trial_balance(cls, date_from=None, date_to=None):
-        from inventory_apps.erp_accounting.models import AccountMove, AccountMoveLine, AccountAccount
-        from django.db.models import Sum, Q
+        from inventory_apps.erp_accounting.models import AccountMoveLine
+        from django.db.models import Sum
 
+        # Filter on the move's date: generated lines carry no date of their own.
         qs = AccountMoveLine.objects.filter(move__state="posted")
         if date_from:
-            qs = qs.filter(date__gte=date_from)
+            qs = qs.filter(move__date__gte=date_from)
         if date_to:
-            qs = qs.filter(date__lte=date_to)
+            qs = qs.filter(move__date__lte=date_to)
 
         return (
             qs.values(

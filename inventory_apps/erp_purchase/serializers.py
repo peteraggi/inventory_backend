@@ -3,7 +3,31 @@ from inventory_apps.erp_base.models import Tax
 from inventory_apps.erp_purchase.models import PurchaseOrder, PurchaseOrderLine
 
 
-class PurchaseOrderLineSerializer(serializers.ModelSerializer):
+class OrderLineValidationMixin:
+    """Quantities must be positive, prices and discounts must be sensible."""
+
+    def validate_product_uom_qty(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than zero.")
+        return value
+
+    def validate_product_qty(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be greater than zero.")
+        return value
+
+    def validate_price_unit(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Price cannot be negative.")
+        return value
+
+    def validate_discount(self, value):
+        if value < 0 or value > 100:
+            raise serializers.ValidationError("Discount must be between 0 and 100 percent.")
+        return value
+
+
+class PurchaseOrderLineSerializer(OrderLineValidationMixin, serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_uom_name = serializers.CharField(source="product_uom.name", read_only=True, default="")
     taxes = serializers.PrimaryKeyRelatedField(
@@ -74,6 +98,14 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         lines_data = validated_data.pop("lines", None)
+        if lines_data is not None and instance.state not in ("draft", "sent"):
+            raise serializers.ValidationError(
+                {"lines": "Lines can only be changed while the RFQ is not yet confirmed."}
+            )
+        if "notes" in validated_data and validated_data["notes"] != instance.notes and instance.state not in ("draft", "sent"):
+            raise serializers.ValidationError(
+                {"notes": "Terms can only be changed while the RFQ is not yet confirmed."}
+            )
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

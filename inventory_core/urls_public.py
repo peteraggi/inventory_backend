@@ -16,6 +16,7 @@ from inventory_core.views import health_check
 # not the tenant URL conf that get_schema_view would pick up by default.
 _public_api_patterns = [
     path("platform/", include("inventory_apps.clients.urls")),
+    path("platform/auth/", include("inventory_apps.authentication.platform_urls")),
 ]
 
 schema_view = get_schema_view(
@@ -42,4 +43,5 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     # Onboarding + plans
     path("platform/", include("inventory_apps.clients.urls")),
+    path("platform/auth/", include("inventory_apps.authentication.platform_urls")),
 ]

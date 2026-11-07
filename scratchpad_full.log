@@ -1,0 +1,804 @@
+Using existing test database for alias 'default'...
+D:\django-backend\logsinventory_backend\env\Lib\site-packages\rest_framework\fields.py:1014: UserWarning: min_value should be an integer or Decimal instance.
+  warnings.warn("min_value should be an integer or Decimal instance.")
+..................................................................................................rate limit cache unavailable for signin:ip:127.0.0.1
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+rate limit cache unavailable for signin:email:ada@workspace.test
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+...rate limit cache unavailable for signin:ip:127.0.0.1
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+rate limit cache unavailable for signin:email:lone@workspace.test
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+.rate limit cache unavailable for signin:ip:127.0.0.1
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+rate limit cache unavailable for signin:email:ada@workspace.test
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+.rate limit cache unavailable for signin:ip:127.0.0.1
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+rate limit cache unavailable for signin:email:ada@workspace.test
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+..rate limit cache unavailable for signin:ip:127.0.0.1
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+rate limit cache unavailable for signin:email:ada@workspace.test
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1033, in connect_check_health
+    sock = self._connect()
+           ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1545, in _connect
+    for res in socket.getaddrinfo(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ah\AppData\Local\Programs\Python\Python312\Lib\socket.py", line 976, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\inventory_apps\authentication\ratelimit.py", line 27, in allow
+    count = cache.incr(key)
+            ^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 215, in incr
+    return self._cache.incr(key, delta)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\cache\backends\redis.py", line 135, in incr
+    if not client.exists(key):
+           ^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\commands\core.py", line 2971, in exists
+    return self.execute_command("EXISTS", *names, keys=names)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 787, in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\client.py", line 793, in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\utils.py", line 258, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 3139, in get_connection
+    connection.connect()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1006, in connect
+    self.retry.call_with_retry(
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 132, in call_with_retry
+    raise error
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\retry.py", line 120, in call_with_retry
+    return do()
+           ^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1007, in <lambda>
+    lambda: self.connect_check_health(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\redis\connection.py", line 1055, in connect_check_health
+    raise e
+redis.exceptions.ConnectionError: Error 11001 connecting to redis:6379. getaddrinfo failed.
+...................................Found 141 test(s).
+System check identified no issues (0 silenced).
+Opening balances created: 1
+Opening balances created: 0
+=== Starting migration
+Operations to perform:
+  Apply all migrations: admin, auth, authentication, clients, contenttypes, django_celery_beat, django_celery_results, erp_accounting, erp_base, erp_inventory, erp_pos, erp_purchase, erp_sales, notifications, pos_app, sessions, token_blacklist
+Running migrations:
+  Applying contenttypes.0001_initial...
+ OK
+  Applying contenttypes.0002_remove_content_type_name...
+ OK
+  Applying auth.0001_initial...
+ OK
+  Applying auth.0002_alter_permission_name_max_length...
+ OK
+  Applying auth.0003_alter_user_email_max_length...
+ OK
+  Applying auth.0004_alter_user_username_opts...
+ OK
+  Applying auth.0005_alter_user_last_login_null...
+ OK
+  Applying auth.0006_require_contenttypes_0002...
+ OK
+  Applying auth.0007_alter_validators_add_error_messages...
+ OK
+  Applying auth.0008_alter_user_username_max_length...
+ OK
+  Applying auth.0009_alter_user_last_name_max_length...
+ OK
+  Applying auth.0010_alter_group_name_max_length...
+ OK
+  Applying auth.0011_update_proxy_permissions...
+ OK
+  Applying auth.0012_alter_user_first_name_max_length...
+ OK
+  Applying authentication.0001_initial...
+ OK
+  Applying admin.0001_initial...
+ OK
+  Applying admin.0002_logentry_remove_auto_add...
+ OK
+  Applying admin.0003_logentry_add_action_flag_choices...
+ OK
+  Applying pos_app.0001_initial...
+ OK
+  Applying pos_app.0002_alter_store_options_category_cost_method_and_more...
+ OK
+  Applying pos_app.0003_sync_role_permissions...
+ OK
+  Applying pos_app.0004_contacts_delete_owner_only...
+ OK
+  Applying pos_app.0005_team_resource...
+ OK
+  Applying authentication.0002_alter_user_options_user_role_user_store_and_more...
+ OK
+  Applying authentication.0003_remove_cross_schema_fk_constraints...
+ OK
+  Applying authentication.0004_user_signature...
+ OK
+  Applying authentication.0005_user_permission_overrides...
+ OK
+  Applying authentication.0006_user_extra_roles...
+ OK
+  Applying authentication.0007_user_role_workspace...
+ OK
+  Applying clients.0001_initial...
+ OK
+  Applying clients.0002_waitlistsignup...
+ OK
+  Applying clients.0003_waitlistsignup_whatsapp...
+ OK
+  Applying clients.0004_workspace_membership...
+ OK
+  Applying django_celery_beat.0001_initial...
+ OK
+  Applying django_celery_beat.0002_auto_20161118_0346...
+ OK
+  Applying django_celery_beat.0003_auto_20161209_0049...
+ OK
+  Applying django_celery_beat.0004_auto_20170221_0000...
+ OK
+  Applying django_celery_beat.0005_add_solarschedule_events_choices...
+ OK
+  Applying django_celery_beat.0006_auto_20180322_0932...
+ OK
+  Applying django_celery_beat.0007_auto_20180521_0826...
+ OK
+  Applying django_celery_beat.0008_auto_20180914_1922...
+ OK
+  Applying django_celery_beat.0006_auto_20180210_1226...
+ OK
+  Applying django_celery_beat.0006_periodictask_priority...
+ OK
+  Applying django_celery_beat.0009_periodictask_headers...
+ OK
+  Applying django_celery_beat.0010_auto_20190429_0326...
+ OK
+  Applying django_celery_beat.0011_auto_20190508_0153...
+ OK
+  Applying django_celery_beat.0012_periodictask_expire_seconds...
+ OK
+  Applying django_celery_beat.0013_auto_20200609_0727...
+ OK
+  Applying django_celery_beat.0014_remove_clockedschedule_enabled...
+ OK
+  Applying django_celery_beat.0015_edit_solarschedule_events_choices...
+ OK
+  Applying django_celery_beat.0016_alter_crontabschedule_timezone...
+ OK
+  Applying django_celery_beat.0017_alter_crontabschedule_month_of_year...
+ OK
+  Applying django_celery_beat.0018_improve_crontab_helptext...
+ OK
+  Applying django_celery_beat.0019_alter_periodictasks_options...
+ OK
+  Applying django_celery_results.0001_initial...
+ OK
+  Applying django_celery_results.0002_add_task_name_args_kwargs...
+ OK
+  Applying django_celery_results.0003_auto_20181106_1101...
+ OK
+  Applying django_celery_results.0004_auto_20190516_0412...
+ OK
+  Applying django_celery_results.0005_taskresult_worker...
+ OK
+  Applying django_celery_results.0006_taskresult_date_created...
+ OK
+  Applying django_celery_results.0007_remove_taskresult_hidden...
+ OK
+  Applying django_celery_results.0008_chordcounter...
+ OK
+  Applying django_celery_results.0009_groupresult...
+ OK
+  Applying django_celery_results.0010_remove_duplicate_indices...
+ OK
+  Applying django_celery_results.0011_taskresult_periodic_task_name...
+ OK
+  Applying django_celery_results.0012_taskresult_date_started...
+ OK
+  Applying django_celery_results.0013_taskresult_django_cele_periodi_1993cf_idx...
+ OK
+  Applying django_celery_results.0014_alter_taskresult_status...
+ OK
+  Applying erp_base.0001_initial...
+ OK
+  Applying erp_base.0002_partner_image_alter_company_logo_and_more...
+ OK
+  Applying erp_base.0003_producttemplate_available_in_pos...
+ OK
+  Applying erp_base.0004_currencyrate...
+ OK
+  Applying erp_base.0005_backfill_currency_rates...
+ OK
+  Applying erp_base.0006_producttemplate_invoice_policy_and_more...
+ OK
+  Applying erp_base.0007_alter_currencyrate_rate_date...
+ OK
+  Applying erp_base.0008_company_report_footer_company_report_primary_color...
+ OK
+  Applying erp_base.0009_company_report_layout...
+ OK
+  Applying erp_base.0010_company_report_bank_account_company_report_font_and_more...
+ OK
+  Applying erp_base.0011_tenantmodule...
+ OK
+  Applying erp_base.0012_productattribute_productattributevalue_and_more...
+ OK
+  Applying erp_base.0013_backfill_default_variants...
+ OK
+  Applying erp_inventory.0001_initial...
+ OK
+  Applying erp_sales.0001_initial...
+ OK
+  Applying erp_purchase.0001_initial...
+ OK
+  Applying erp_accounting.0001_initial...
+ OK
+  Applying erp_accounting.0002_alter_accountmove_date_alter_accountpayment_date...
+ OK
+  Applying erp_accounting.0003_accountmoveline_taxes...
+ OK
+  Applying erp_accounting.0004_add_variant_fk_field...
+ OK
+  Applying erp_accounting.0005_backfill_variant_fk_field...
+ OK
+  Applying erp_accounting.0006_finalize_variant_fk_field...
+ OK
+  Applying erp_accounting.0007_account_is_tax...
+ OK
+  Applying erp_inventory.0002_alter_stockinventoryadjustment_date...
+ OK
+  Applying erp_inventory.0003_add_variant_fk_fields...
+ OK
+  Applying erp_inventory.0004_backfill_variant_fk_fields...
+ OK
+  Applying erp_inventory.0005_finalize_variant_fk_fields...
+ OK
+  Applying erp_inventory.0006_quant_unique_without_lot...
+ OK
+  Applying erp_inventory.0007_scrap_orders_and_notification_types...
+ OK
+  Applying erp_inventory.0008_valuation_ledger_and_returns...
+ OK
+  Applying erp_inventory.0009_lot_costing_and_ledger_guard...
+ OK
+  Applying erp_pos.0001_initial...
+ OK
+  Applying erp_pos.0002_posorderline_tax_exempt...
+ OK
+  Applying erp_pos.0003_add_variant_fk_field...
+ OK
+  Applying erp_pos.0004_backfill_variant_fk_field...
+ OK
+  Applying erp_pos.0005_finalize_variant_fk_field...
+ OK
+  Applying erp_pos.0006_order_external_ref...
+ OK
+  Applying erp_purchase.0002_purchaseorder_partner_ref...
+ OK
+  Applying erp_purchase.0003_purchaseorderline_taxes...
+ OK
+  Applying erp_purchase.0004_purchaseorder_active...
+ OK
+  Applying erp_purchase.0005_add_variant_fk_field...
+ OK
+  Applying erp_purchase.0006_backfill_variant_fk_field...
+ OK
+  Applying erp_purchase.0007_finalize_variant_fk_field...
+ OK
+  Applying erp_purchase.0008_purchaseorderline_product_uom...
+ OK
+  Applying erp_sales.0002_saleorder_active...
+ OK
+  Applying erp_sales.0003_saleorder_salesperson...
+ OK
+  Applying erp_sales.0004_add_variant_fk_field...
+ OK
+  Applying erp_sales.0005_backfill_variant_fk_field...
+ OK
+  Applying erp_sales.0006_finalize_variant_fk_field...
+ OK
+  Applying erp_sales.0007_saleorderline_product_uom...
+ OK
+  Applying notifications.0001_initial...
+ OK
+  Applying notifications.0002_scrap_orders_and_notification_types...
+ OK
+  Applying sessions.0001_initial...
+ OK
+  Applying token_blacklist.0001_initial...
+ OK
+  Applying token_blacklist.0002_outstandingtoken_jti_hex...
+ OK
+  Applying token_blacklist.0003_auto_20171017_2007...
+ OK
+  Applying token_blacklist.0004_auto_20171017_2013...
+ OK
+  Applying token_blacklist.0005_remove_outstandingtoken_jti...
+ OK
+  Applying token_blacklist.0006_auto_20171017_2113...
+ OK
+  Applying token_blacklist.0007_auto_20171017_2214...
+ OK
+  Applying token_blacklist.0008_migrate_to_bigautofield...
+ OK
+  Applying token_blacklist.0010_fix_migrate_to_bigautofield...
+ OK
+  Applying token_blacklist.0011_linearizes_history...
+ OK
+  Applying token_blacklist.0012_alter_outstandingtoken_user...
+ OK
+  Applying token_blacklist.0013_alter_blacklistedtoken_options_and_more...
+.
+----------------------------------------------------------------------
+Ran 141 tests in 707.562s
+
+OK
+Preserving test database for alias 'default'...
+ OK
+EXIT 0

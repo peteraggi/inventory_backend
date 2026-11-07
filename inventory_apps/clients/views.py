@@ -19,6 +19,8 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+from inventory_apps.erp_base.rbac_constants import DEFAULT_ROLE_PERMISSIONS
+
 DEFAULT_ROLES = [
     {
         "name": "owner",
@@ -105,7 +107,7 @@ def _seed_tenant(
                 defaults={
                     "display_name": role_data["display_name"],
                     "description": role_data["description"],
-                    "permissions": role_data["permissions"],
+                    "permissions": DEFAULT_ROLE_PERMISSIONS.get(role_data["name"], {}),
                 },
             )
             if role_data["name"] == "owner":
@@ -193,6 +195,13 @@ def _seed_tenant(
         user.is_verified = True
         user.save(skip_validation=True)
 
+        from inventory_apps.clients.workspaces import link_user
+        link_user(
+            user,
+            store_id=store.id,
+            role_id=owner_role.id if owner_role else None,
+            client=Client.objects.get(schema_name=schema_name),
+        )
         return user.tokens()
 
 
@@ -355,12 +364,14 @@ class OnboardingAPIView(views.APIView):
                 plan=plan,
                 on_trial=True,
                 trial_ends=trial_ends,
+                approval_status="pending",
             )
             client.save()
 
             Domain.objects.create(domain=full_domain, tenant=client, is_primary=True)
 
-            owner_tokens = _seed_tenant(
+            # The owner's account is created now, but no session is issued until a super admin approves the business.
+            _seed_tenant(
                 schema_name=schema_name,
                 store_name=store_name,
                 owner_name=data["contact_name"],
@@ -372,7 +383,11 @@ class OnboardingAPIView(views.APIView):
             return Response(
                 {
                     "success": True,
-                    "message": "Your workspace is ready.",
+                    "pending_approval": True,
+                    "message": (
+                        "Your business is registered and awaits approval from the platform team. "
+                        "You can sign in once it is approved."
+                    ),
                     "tenant": {
                         "id": str(client.id),
                         "business_name": client.name,
@@ -385,7 +400,6 @@ class OnboardingAPIView(views.APIView):
                     "owner": {
                         "email": data["contact_email"],
                         "name": data["contact_name"],
-                        "tokens": owner_tokens,
                     },
                 },
                 status=status.HTTP_201_CREATED,

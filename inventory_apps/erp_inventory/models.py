@@ -16,6 +16,22 @@ class Warehouse(models.Model):
         null=True, blank=True,
     )
     active = models.BooleanField(default=True)
+    lot_stock_location = models.ForeignKey(
+        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="warehouse_stock", db_column="lot_stock_location_id",
+    )
+    wh_input_location = models.ForeignKey(
+        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="warehouse_input", db_column="wh_input_location_id",
+    )
+    wh_output_location = models.ForeignKey(
+        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="warehouse_output", db_column="wh_output_location_id",
+    )
+    view_location = models.ForeignKey(
+        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="warehouse_view", db_column="view_location_id",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -96,37 +112,6 @@ class Warehouse(models.Model):
                 default_location_dest=stock_loc,
                 sequence_prefix=f"{self.short_name}/INT/",
             )
-
-
-# Add FK fields to Warehouse that reference locations (can't do circular at class definition)
-Warehouse.add_to_class(
-    "lot_stock_location",
-    models.ForeignKey(
-        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="warehouse_stock", db_column="lot_stock_location_id",
-    ),
-)
-Warehouse.add_to_class(
-    "wh_input_location",
-    models.ForeignKey(
-        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="warehouse_input", db_column="wh_input_location_id",
-    ),
-)
-Warehouse.add_to_class(
-    "wh_output_location",
-    models.ForeignKey(
-        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="warehouse_output", db_column="wh_output_location_id",
-    ),
-)
-Warehouse.add_to_class(
-    "view_location",
-    models.ForeignKey(
-        "StockLocation", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="warehouse_view", db_column="view_location_id",
-    ),
-)
 
 
 class StockLocation(models.Model):
@@ -252,6 +237,10 @@ class StockPicking(models.Model):
     date_done = models.DateTimeField(null=True, blank=True)
     origin = models.CharField(max_length=255, blank=True, help_text="Source document reference")
     note = models.TextField(blank=True)
+    return_of = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="returns",
+        help_text="The done transfer this one reverses",
+    )
     location_src = models.ForeignKey(
         StockLocation, on_delete=models.PROTECT, related_name="pickings_from",
     )
@@ -338,6 +327,7 @@ class StockMove(models.Model):
         max_digits=18, decimal_places=4, default=Decimal("0.0000"),
         help_text="Unit cost at time of move",
     )
+    date_done = models.DateTimeField(null=True, blank=True, help_text="When the move was validated")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -369,6 +359,14 @@ class StockQuant(models.Model):
 
     class Meta:
         unique_together = [("product", "location", "lot")]
+        constraints = [
+            # unique_together ignores NULLs, so stock without a lot needs its own guarantee.
+            models.UniqueConstraint(
+                fields=["product", "location"],
+                condition=models.Q(lot__isnull=True),
+                name="uniq_quant_product_location_no_lot",
+            ),
+        ]
         ordering = ["product__product_template__name"]
 
     def __str__(self):
@@ -452,3 +450,154 @@ class ReorderingRule(models.Model):
 
     def __str__(self):
         return f"Reorder {self.product.name}: min={self.min_qty}, max={self.max_qty}"
+
+
+class ScrapOrder(models.Model):
+    """Removes stock from a location by moving it to the scrap location on validation."""
+    STATE_CHOICES = [("draft", "Draft"), ("done", "Done"), ("cancel", "Cancelled")]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, blank=True, db_index=True)
+    product = models.ForeignKey(
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="scrap_orders",
+    )
+    lot = models.ForeignKey(
+        StockLot, on_delete=models.SET_NULL, null=True, blank=True, related_name="scrap_orders",
+    )
+    quantity = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("1.0000"))
+    location = models.ForeignKey(
+        StockLocation, on_delete=models.PROTECT, related_name="scrap_orders_from",
+    )
+    scrap_location = models.ForeignKey(
+        StockLocation, on_delete=models.PROTECT, related_name="scrap_orders_to",
+    )
+    state = models.CharField(max_length=10, choices=STATE_CHOICES, default="draft")
+    origin = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name or str(self.id)
+
+    def save(self, *args, **kwargs):
+        if not self.name:
+            from inventory_apps.erp_base.models import SequenceCounter
+            self.name = SequenceCounter.next_sequence("SCRAP")
+        super().save(*args, **kwargs)
+
+
+class StockLedgerEntry(models.Model):
+    """
+    Append-only history of every quantity change at a location.
+    `resulting_quantity` is the balance at that location straight after the change.
+    """
+    CHANGE_CHOICES = [
+        ("RECEIPT", "Receipt"),
+        ("DELIVERY", "Delivery"),
+        ("TRANSFER_IN", "Transfer In"),
+        ("TRANSFER_OUT", "Transfer Out"),
+        ("ADJUSTMENT", "Inventory Adjustment"),
+        ("STOCK_TAKE", "Physical Count"),
+        ("SCRAP", "Scrap"),
+        ("OPENING_BALANCE", "Opening Balance"),
+    ]
+    REFERENCE_CHOICES = [
+        ("TRANSFER", "Transfer"),
+        ("ADJUSTMENT", "Inventory Adjustment"),
+        ("STOCK_TAKE", "Physical Count"),
+        ("SCRAP", "Scrap Order"),
+        ("OPENING", "Opening Balance"),
+        ("MANUAL", "Manual"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="ledger_entries",
+    )
+    location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="ledger_entries")
+    lot = models.ForeignKey(
+        StockLot, on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_entries",
+    )
+    change_type = models.CharField(max_length=20, choices=CHANGE_CHOICES)
+    quantity_change = models.DecimalField(max_digits=18, decimal_places=4)
+    resulting_quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    unit_cost = models.DecimalField(max_digits=18, decimal_places=4, default=Decimal("0.0000"))
+    reference_type = models.CharField(max_length=20, choices=REFERENCE_CHOICES, blank=True)
+    reference_id = models.UUIDField(null=True, blank=True)
+    reference_name = models.CharField(max_length=100, blank=True)
+    source_move = models.ForeignKey(
+        "StockMove", on_delete=models.SET_NULL, null=True, blank=True, related_name="ledger_entries",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["product", "location", "created_at"]),
+            models.Index(fields=["reference_id"]),
+        ]
+        constraints = [
+            # One move posts once per side: a source and a destination row, each with its own change type.
+            models.UniqueConstraint(
+                fields=["source_move", "location", "change_type"],
+                condition=models.Q(source_move__isnull=False),
+                name="uniq_ledger_row_per_move_side",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.change_type} {self.quantity_change} @ {self.location_id}"
+
+
+class InventoryCostLayer(models.Model):
+    """
+    A batch of stock valued at one unit cost. Outbound stock consumes layers oldest-first (FIFO).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="cost_layers",
+    )
+    location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="cost_layers")
+    lot = models.ForeignKey(
+        StockLot, on_delete=models.PROTECT, null=True, blank=True, related_name="cost_layers",
+    )
+    received_at = models.DateTimeField(default=timezone.now)
+    quantity_received = models.DecimalField(max_digits=18, decimal_places=4)
+    quantity_remaining = models.DecimalField(max_digits=18, decimal_places=4)
+    unit_cost = models.DecimalField(max_digits=18, decimal_places=4)
+    source_reference = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["received_at", "created_at"]
+        indexes = [models.Index(fields=["product", "location", "quantity_remaining"])]
+
+    def __str__(self):
+        return f"{self.product_id} @ {self.unit_cost} x {self.quantity_remaining}"
+
+
+class InventoryNrvAdjustment(models.Model):
+    """Write-down recorded when cost exceeds net realisable value (the sale price)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product = models.ForeignKey(
+        "erp_base.ProductVariant", on_delete=models.PROTECT, related_name="nrv_adjustments",
+    )
+    location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="nrv_adjustments")
+    lot = models.ForeignKey(
+        StockLot, on_delete=models.PROTECT, null=True, blank=True, related_name="nrv_adjustments",
+    )
+    quantity_basis = models.DecimalField(max_digits=18, decimal_places=4)
+    cost_per_unit = models.DecimalField(max_digits=18, decimal_places=4)
+    nrv_per_unit = models.DecimalField(max_digits=18, decimal_places=4)
+    per_unit_adjustment = models.DecimalField(max_digits=18, decimal_places=4)
+    total_adjustment = models.DecimalField(max_digits=18, decimal_places=4)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"NRV {self.product_id} @ {self.location_id}: {self.total_adjustment}"

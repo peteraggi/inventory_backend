@@ -459,11 +459,21 @@ class Tax(models.Model):
         return f"{self.name} ({self.amount}%)"
 
     def compute_amount(self, base: Decimal) -> Decimal:
-        if self.amount_type == "percent":
-            return (base * self.amount / Decimal("100")).quantize(Decimal("0.01"))
+        """Computes this tax's amount given `base`. When `price_include` is
+        set (Odoo's "Included in Price" checkbox), `base` must be the tax-
+        INCLUSIVE amount and this returns the portion of it that is tax —
+        i.e. what to subtract to reach the untaxed amount. Otherwise `base`
+        is the tax-EXCLUSIVE amount and this returns the tax to add on top.
+        See erp_base/pricing.py for how a whole line's totals use this."""
         if self.amount_type == "fixed":
             return self.amount
+        if self.amount_type == "percent":
+            if self.price_include:
+                return (base * self.amount / (Decimal("100") + self.amount)).quantize(Decimal("0.01"))
+            return (base * self.amount / Decimal("100")).quantize(Decimal("0.01"))
         if self.amount_type == "division":
+            # Legacy alias for "Percentage" + "Included in Price" — same math,
+            # kept so any tax already configured this way keeps working.
             return (base - base / (1 + self.amount / Decimal("100"))).quantize(Decimal("0.01"))
         return Decimal("0.00")
 

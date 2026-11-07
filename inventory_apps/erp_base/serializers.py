@@ -205,6 +205,8 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     supplier_taxes = serializers.PrimaryKeyRelatedField(source="product_template.supplier_taxes", many=True, read_only=True)
     supplier_tax_names = serializers.SerializerMethodField()
     available_in_pos = serializers.BooleanField(source="product_template.available_in_pos", read_only=True)
+    qty_on_hand = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
+    qty_available = serializers.DecimalField(max_digits=18, decimal_places=4, read_only=True)
 
     class Meta:
         model = ProductVariant
@@ -212,7 +214,8 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "id", "product_template", "template_name", "display_name", "attribute_values",
             "internal_reference", "barcode", "price_extra", "sale_price", "standard_price",
             "product_type", "uom", "uom_name", "category_name", "taxes", "tax_names",
-            "supplier_taxes", "supplier_tax_names", "available_in_pos", "image", "active",
+            "supplier_taxes", "supplier_tax_names", "available_in_pos", "qty_on_hand", "qty_available",
+            "image", "active",
         ]
         read_only_fields = ["id", "product_template", "attribute_values"]
 
@@ -273,7 +276,7 @@ class ProductTemplateListSerializer(serializers.ModelSerializer):
         model = ProductTemplate
         fields = [
             "id", "name", "internal_reference", "barcode",
-            "product_type", "category_name", "uom_name", "image",
+            "product_type", "category", "category_name", "uom_name", "image",
             "sale_price", "standard_price", "taxes", "supplier_taxes",
             "qty_on_hand", "active", "is_favorite", "variant_count",
         ]

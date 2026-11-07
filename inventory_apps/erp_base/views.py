@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from inventory_apps.authentication.permissions import HasErpPermission, HasErpPermissionOrReadOnly
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.contenttypes.models import ContentType
 
@@ -41,7 +42,8 @@ PRODUCT_TRACKED_FIELDS = {
 class CurrencyViewSet(viewsets.ModelViewSet):
     queryset = Currency.objects.filter(active=True)
     serializer_class = CurrencySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "settings"
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "code"]
 
@@ -60,7 +62,8 @@ class CurrencyViewSet(viewsets.ModelViewSet):
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.filter(active=True)
     serializer_class = CompanySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "settings"
 
     @action(detail=False, methods=["post"], url_path="setup")
     def setup(self, request):
@@ -73,18 +76,41 @@ class TenantModuleViewSet(viewsets.ModelViewSet):
     Rows are seeded (see SetupService); only `enabled` is ever written."""
     queryset = TenantModule.objects.all()
     serializer_class = TenantModuleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "settings"
     pagination_class = None
     http_method_names = ["get", "patch", "head", "options"]
 
 
-class PartnerViewSet(viewsets.ModelViewSet):
+class ContactsErrorMixin:
+    """Contact endpoints return {"success": False, "error": "..."} on failure."""
+
+    def get_exception_handler(self):
+        from inventory_core.exceptions import inventory_exception_handler
+        return inventory_exception_handler
+
+
+class PartnerViewSet(ContactsErrorMixin, viewsets.ModelViewSet):
+    """
+    Customers and vendors. Deleting one is owner-only by default (contacts.delete).
+    A contact that already has orders, bills or payments is refused; archive it instead.
+    """
     queryset = Partner.objects.filter(active=True).select_related("payment_term")
     serializer_class = PartnerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermission]
+    erp_resource = "contacts"
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "email", "phone", "tax_id"]
     filterset_fields = ["is_customer", "is_vendor", "partner_type"]
+
+    def perform_destroy(self, instance):
+        from inventory_apps.erp_base.exceptions import ContactInUseError
+        # Some relations would only SET_NULL on delete, silently detaching invoices or payments
+        # from their customer. Check every relation first and refuse if anything still points here.
+        for relation in instance._meta.related_objects:
+            if relation.related_model.objects.filter(**{relation.field.name: instance}).exists():
+                raise ContactInUseError()
+        instance.delete()
 
     @action(detail=False, url_path="customers")
     def customers(self, request):
@@ -106,26 +132,30 @@ class PartnerViewSet(viewsets.ModelViewSet):
 class PaymentTermViewSet(viewsets.ModelViewSet):
     queryset = PaymentTerm.objects.filter(active=True).prefetch_related("lines")
     serializer_class = PaymentTermSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "settings"
 
 
 class UomCategoryViewSet(viewsets.ModelViewSet):
     queryset = UomCategory.objects.all()
     serializer_class = UomCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "inventory"
 
 
 class UnitOfMeasureViewSet(viewsets.ModelViewSet):
     queryset = UnitOfMeasure.objects.filter(active=True).select_related("category")
     serializer_class = UnitOfMeasureSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "inventory"
     filterset_fields = ["category"]
 
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
     queryset = ProductCategory.objects.filter(active=True)
     serializer_class = ProductCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "inventory"
     filter_backends = [filters.SearchFilter]
     search_fields = ["name", "complete_name"]
 
@@ -133,13 +163,15 @@ class ProductCategoryViewSet(viewsets.ModelViewSet):
 class TaxGroupViewSet(viewsets.ModelViewSet):
     queryset = TaxGroup.objects.all()
     serializer_class = TaxGroupSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "settings"
 
 
 class TaxViewSet(viewsets.ModelViewSet):
     queryset = Tax.objects.filter(active=True)
     serializer_class = TaxSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "settings"
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name"]
     filterset_fields = ["type_tax_use", "amount_type"]
@@ -149,7 +181,8 @@ class ProductTemplateViewSet(viewsets.ModelViewSet):
     queryset = ProductTemplate.objects.filter(active=True).select_related(
         "category", "uom", "purchase_uom"
     ).prefetch_related("taxes", "supplier_taxes")
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "inventory"
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ["name", "internal_reference", "barcode"]
     filterset_fields = ["product_type", "category", "can_be_sold", "can_be_purchased", "available_in_pos"]
@@ -270,7 +303,8 @@ class ProductAttributeViewSet(viewsets.ModelViewSet):
     dimensions (Color, Size, …) with their possible values."""
     queryset = ProductAttribute.objects.all().prefetch_related("values")
     serializer_class = ProductAttributeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "inventory"
     pagination_class = None
 
 
@@ -286,10 +320,13 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     queryset = (
         ProductVariant.objects.all()
         .select_related("product_template", "product_template__uom", "product_template__category")
-        .prefetch_related("attribute_values", "product_template__taxes")
+        .prefetch_related(
+            "attribute_values", "product_template__taxes", "product_template__supplier_taxes", "quants",
+        )
     )
     serializer_class = ProductVariantSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasErpPermissionOrReadOnly]
+    erp_resource = "inventory"
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ["product_template", "active", "product_template__available_in_pos"]
     search_fields = [

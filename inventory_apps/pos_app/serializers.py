@@ -81,6 +81,13 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "display_name", "description", "permissions"]
         read_only_fields = ["id"]
 
+    def validate_permissions(self, value):
+        from inventory_apps.authentication.rbac import validate_matrix
+        problems = validate_matrix(value)
+        if problems:
+            raise serializers.ValidationError(problems)
+        return value
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.UUIDField(source="id", read_only=True)

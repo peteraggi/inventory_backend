@@ -120,6 +120,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_constraint=False,  # role lives in tenant schema; no cross-schema FK enforcement
     )
 
+    # Individual grants on top of the role (same shape as Role.permissions). Only adds access.
+    permission_overrides = models.JSONField(
+        default=dict, blank=True,
+        help_text="Extra permissions granted to this user on top of their role",
+    )
+
     # Status fields
     is_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -228,21 +234,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         }
 
     @property
-    def is_owner(self):
-        """Check if user is a store owner."""
-        return self.role and self.role.name == 'owner'
-
-    @property
-    def is_manager(self):
-        """Check if user is a store manager."""
-        return self.role and self.role.name == 'manager'
-
-    @property
-    def is_salesperson(self):
-        """Check if user is a salesperson."""
-        return self.role and self.role.name == 'salesperson'
-
-    @property
     def role_display(self):
         """Get role display name safely."""
         if self.role:
@@ -256,18 +247,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             return getattr(self.store, 'name', 'Unknown Store')
         return 'No Store'
 
-    def has_permission(self, permission_key):
-        """
-        Check if user has a specific permission.
-        """
-        if self.is_superuser:
-            return True
-
-        if not self.role:
-            return False
-
-        permissions = getattr(self.role, 'permissions', {})
-        return permissions.get(permission_key, False)
+    def has_erp_permission(self, resource, action):
+        """True when the user's role or individual grants allow `action` on `resource`."""
+        from inventory_apps.authentication.rbac import user_can
+        return user_can(self, resource, action)
 
     def get_full_name(self):
         """Return the user's full name."""
@@ -276,3 +259,37 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_short_name(self):
         """Return the user's short name."""
         return self.name.split()[0] if self.name else self.username
+
+
+class UserRole(models.Model):
+    """
+    An extra role held by a user, on top of their primary role (User.role).
+
+    Revoking a role sets `unassigned_at` rather than deleting the row, so the history of
+    who held which access, and when, is kept.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='extra_roles')
+    role = models.ForeignKey(
+        'pos_app.Role', on_delete=models.PROTECT, related_name='user_assignments',
+        db_constraint=False,  # role lives in the tenant schema, as User.role does
+    )
+    assigned_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='roles_assigned',
+    )
+    # The business (clients.Client id) this role applies in. Roles ids are only meaningful there.
+    workspace_id = models.UUIDField(null=True, blank=True, db_index=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    unassigned_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'role', 'workspace_id'],
+                condition=models.Q(unassigned_at__isnull=True),
+                name='uniq_active_user_role',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} + {self.role_id}"

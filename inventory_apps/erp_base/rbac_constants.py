@@ -20,6 +20,7 @@ RESOURCES = {
     "CONTACTS": "contacts",
     "REPORTS": "reports",
     "SETTINGS": "settings",
+    "TEAM": "team",
 }
 
 ACTIONS = {
@@ -78,6 +79,17 @@ DEFAULT_ROLE_PERMISSIONS = {
         read=[RESOURCES["INVENTORY"], RESOURCES["REPORTS"]],
     ),
 }
+
+# Managing staff (invite, roles, access) is a team permission. Managers run the team; they
+# cannot delete members, and only owners can assign the owner role (checked in the serializers).
+DEFAULT_ROLE_PERMISSIONS["manager"][RESOURCES["TEAM"]] = {
+    "read": True, "create": True, "update": True, "delete": False,
+}
+
+# Deleting a customer or vendor is the business owner's decision: only owners get it by default.
+for _role, _matrix in DEFAULT_ROLE_PERMISSIONS.items():
+    if _role != "owner":
+        _matrix[RESOURCES["CONTACTS"]]["delete"] = False
 
 DEFAULT_ROLE_DESCRIPTIONS = {
     "owner": "Full access to every module, including settings and role permissions.",

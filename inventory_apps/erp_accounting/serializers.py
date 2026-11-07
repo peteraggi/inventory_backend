@@ -117,7 +117,8 @@ class AccountMoveSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         lines_data = validated_data.pop("lines", None)
         if instance.state == "posted":
-            raise serializers.ValidationError("Cannot edit a posted journal entry")
+            from inventory_apps.erp_accounting.exceptions import PostedDocumentError
+            raise PostedDocumentError()
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

@@ -67,6 +67,8 @@ TENANT_APPS = [
     "inventory_apps.erp_purchase",
     "inventory_apps.erp_accounting",
     "inventory_apps.erp_pos",
+    # In-app notifications (per-tenant user messages)
+    "inventory_apps.notifications",
 ]
 
 # INSTALLED_APPS must be SHARED_APPS ∪ TENANT_APPS (shared first, no duplicates)
@@ -227,7 +229,7 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 10,
     "NON_FIELD_ERRORS_KEY": "error",
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "inventory_apps.authentication.authentication.WorkspaceJWTAuthentication",
     ),
 }
 

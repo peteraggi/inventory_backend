@@ -195,7 +195,7 @@ class SetupService:
         for code, name, acct_type in coa_entries:
             AccountAccount.objects.get_or_create(
                 code=code,
-                defaults={"name": name, "account_type": acct_type},
+                defaults={"name": name, "account_type": acct_type, "is_tax_account": code == "2100"},
             )
 
         # Journals

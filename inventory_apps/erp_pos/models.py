@@ -159,6 +159,10 @@ class POSOrder(models.Model):
     amount_return = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
 
     note = models.TextField(blank=True)
+    external_ref = models.CharField(
+        max_length=100, blank=True, db_index=True,
+        help_text="Reference from the offline register, so a sale is never synced twice",
+    )
     invoice = models.OneToOneField(
         "erp_accounting.AccountMove", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="pos_order",
@@ -193,10 +197,6 @@ class POSOrder(models.Model):
             update_fields=["amount_tax", "amount_total", "amount_paid", "amount_return"]
         )
 
-    def action_paid(self):
-        from inventory_apps.erp_pos.services import POSService
-        POSService.process_payment(self)
-
 
 class POSOrderLine(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -225,15 +225,12 @@ class POSOrderLine(models.Model):
         ordering = ["id"]
 
     def save(self, *args, **kwargs):
-        base = self.price_unit * self.qty
-        disc = base * (self.discount / Decimal("100"))
-        self.price_subtotal = (base - disc).quantize(Decimal("0.01"))
-        tax_total = Decimal("0.00")
-        if self.product_id and not self.tax_exempt:
-            for tax in self.product.taxes.filter(active=True):
-                tax_total += tax.compute_amount(self.price_subtotal)
-        self.price_tax = tax_total
-        self.price_subtotal_incl = self.price_subtotal + tax_total
+        from inventory_apps.erp_base.pricing import compute_line_amounts
+
+        taxes = self.product.taxes.filter(active=True) if (self.product_id and not self.tax_exempt) else []
+        self.price_subtotal, self.price_tax, self.price_subtotal_incl = compute_line_amounts(
+            self.price_unit, self.qty, self.discount, taxes,
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -25,6 +25,7 @@ _tenant_api_patterns = [
     path('erp/purchase/', include('inventory_apps.erp_purchase.urls')),
     path('erp/accounting/', include('inventory_apps.erp_accounting.urls')),
     path('erp/pos/', include('inventory_apps.erp_pos.urls')),
+    path('notifications/', include('inventory_apps.notifications.urls')),
 ]
 
 schema_view = get_schema_view(
