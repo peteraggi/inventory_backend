@@ -39,6 +39,7 @@ from ..authentication.models import User
 # ─── STORE & ROLE ─────────────────────────────────────────────────────────────
 
 
+from inventory_core.errors import user_message
 class StoreSerializer(serializers.ModelSerializer):
     user_count = serializers.SerializerMethodField()
     product_count = serializers.SerializerMethodField()
@@ -470,14 +471,14 @@ class BulkInvoiceSyncSerializer(serializers.Serializer):
                 failed_invoices.append(
                     {
                         "invoice_number": invoice_data.get("invoice_number", "Unknown"),
-                        "errors": e.detail if hasattr(e, "detail") else str(e),
+                        "errors": e.detail if hasattr(e, "detail") else user_message(e, "This sale could not be saved."),
                     }
                 )
             except Exception as e:
                 failed_invoices.append(
                     {
                         "invoice_number": invoice_data.get("invoice_number", "Unknown"),
-                        "errors": {"error": str(e)},
+                        "errors": {"error": user_message(e, "This sale could not be saved.")},
                     }
                 )
 

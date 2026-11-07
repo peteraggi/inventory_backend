@@ -12,6 +12,10 @@ from django.utils.http import urlsafe_base64_decode
 
 from ..pos_app.models import Store, Role
 
+import logging
+from inventory_core.errors import user_message
+
+logger = logging.getLogger(__name__)
 class RegisterSerializer(serializers.ModelSerializer):
     """
     Serializer for user registration with store and role assignment.
@@ -120,7 +124,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             link_user(user, store_id=validated_data['store'].id, role_id=validated_data['role'].id)
             return user
         except Exception as e:
-            raise serializers.ValidationError(f'Failed to create user: {str(e)}')
+            raise serializers.ValidationError(user_message(e, 'We could not create this user. Check the details and try again.'))
 
 
 class LoginSerializer(serializers.ModelSerializer):
@@ -362,7 +366,8 @@ class SetNewPasswordSerializer(serializers.Serializer):
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             raise AuthenticationFailed('The reset link is invalid', 401)
         except Exception as e:
-            raise AuthenticationFailed(f'Password reset failed: {str(e)}', 401)
+            logger.exception('Password reset failed')
+            raise AuthenticationFailed('This reset link is no longer valid. Request a new code and try again.', 401)
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
@@ -646,7 +651,8 @@ class LogoutSerializer(serializers.Serializer):
         except TokenError:
             raise serializers.ValidationError("Token is expired or invalid")
         except Exception as e:
-            raise serializers.ValidationError(f"Logout failed: {str(e)}")
+            logger.exception("Logout failed")
+            raise serializers.ValidationError("We could not sign you out just now. Please try again.")
 
     def save(self, **kwargs):
         """No-op save method."""

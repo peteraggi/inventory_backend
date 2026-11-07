@@ -92,6 +92,7 @@ from .serializers import (
 from .permissions import HasLegacyResource, IsSameStore
 from inventory_apps.authentication.rbac import sees_all_records
 
+from inventory_core.errors import user_message
 logger = logging.getLogger(__name__)
 
 
@@ -464,7 +465,7 @@ class BulkInvoiceSyncView(generics.CreateAPIView):
                 status="failed",
                 items_synced=0,
                 items_failed=0,
-                error_message=str(e),
+                error_message=user_message(e, "This sale could not be synced. Try again."),
                 completed_at=timezone.now(),
             )
             return Response(
@@ -940,7 +941,7 @@ class ConfirmPurchaseOrderView(views.APIView):
         except PurchaseOrder.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -997,7 +998,7 @@ class ValidateGoodsReceiptView(views.APIView):
         except GoodsReceipt.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Goods receipt validation error: {e}", exc_info=True)
             return Response(
@@ -1063,7 +1064,7 @@ class ConfirmVendorBillView(views.APIView):
         except VendorBill.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Vendor bill confirmation error: {e}", exc_info=True)
             return Response(
@@ -1133,7 +1134,7 @@ class ConfirmSalesOrderView(views.APIView):
         except SalesOrder.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1190,7 +1191,7 @@ class ValidateDeliveryNoteView(views.APIView):
         except DeliveryNote.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Delivery note validation error: {e}", exc_info=True)
             return Response(
@@ -1258,7 +1259,7 @@ class PostSalesInvoiceView(views.APIView):
         except SalesInvoice.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Sales invoice post error: {e}", exc_info=True)
             return Response(
@@ -1315,7 +1316,7 @@ class ConfirmPaymentView(views.APIView):
         except Payment.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": user_message(e, "This request could not be completed.")}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Payment confirmation error: {e}", exc_info=True)
             return Response(
@@ -1652,7 +1653,7 @@ def bulk_upload_products(request):
                         products_to_create.append(product)
                         success_count += 1
                     except Exception as e:
-                        errors.append(f"Row {idx}: {e}")
+                        errors.append(f"Row {idx}: {user_message(e, 'this row could not be read')}")
                 if products_to_create:
                     Product.objects.bulk_create(products_to_create)
             if success_count > 0:
@@ -1671,7 +1672,7 @@ def bulk_upload_products(request):
             return redirect("admin:pos_app_product_changelist")
         except Exception as e:
             logger.error(f"Bulk upload error: {e}", exc_info=True)
-            messages.error(request, f"Error processing file: {e}")
+            messages.error(request, user_message(e, "We could not read this file. Check the format and try again."))
             return redirect("admin:pos_app_product_bulk_upload")
 
     return render(request, "admin/pos_app/product/bulk_upload.html")

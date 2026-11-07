@@ -7,6 +7,7 @@ from django.db.models import Count
 from .models import User
 
 
+from inventory_core.errors import user_message
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """
@@ -167,7 +168,7 @@ class UserAdmin(BaseUserAdmin):
 
         except Exception as e:
             from django.contrib import messages
-            messages.error(request, f'Error saving user: {str(e)}')
+            messages.error(request, user_message(e, 'We could not save this user. Check the details and try again.'))
 
     actions = ['verify_users', 'activate_users', 'deactivate_users']
 

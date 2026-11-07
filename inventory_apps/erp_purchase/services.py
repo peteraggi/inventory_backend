@@ -15,6 +15,7 @@ from inventory_apps.erp_purchase.exceptions import (
 )
 
 
+from inventory_core.errors import user_message
 def _receipts_for(order):
     from inventory_apps.erp_inventory.models import StockPicking
     return StockPicking.objects.filter(origin=order.name)
@@ -40,7 +41,7 @@ class PurchaseService:
         try:
             StockService.create_receipt_from_po(purchase_order)
         except ValueError as e:
-            raise PurchaseOrderError(str(e))
+            raise PurchaseOrderError(user_message(e, "This purchase order could not be updated."))
 
         purchase_order.receipt_count = _receipts_for(purchase_order).count()
         purchase_order.save(update_fields=["receipt_count"])

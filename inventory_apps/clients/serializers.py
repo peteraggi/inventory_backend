@@ -29,20 +29,23 @@ class OnboardingSerializer(serializers.Serializer):
     store_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
 
     def validate_contact_email(self, value):
+        from inventory_apps.authentication.models import User
         value = value.lower().strip()
-        if Client.objects.filter(contact_email=value).exists():
-            raise serializers.ValidationError('An account with this email already exists.')
+        if User.objects.filter(email=value).exists() or Client.objects.filter(contact_email=value).exists():
+            raise serializers.ValidationError(
+                'An account already uses this email. Sign in instead, or use a different email.'
+            )
         return value
 
     def validate_subdomain(self, value):
+        from inventory_apps.clients.onboarding import schema_exists, schema_name_for
         value = value.lower().strip()
         if not re.match(r'^[a-z][a-z0-9\-]{1,61}[a-z0-9]$', value):
             raise serializers.ValidationError(
-                'Subdomain must start with a letter, use only letters/digits/hyphens, '
-                'and be between 3 and 63 characters.'
+                'Use 3 to 63 letters, digits or hyphens, starting with a letter and not ending in a hyphen.'
             )
-        if Domain.objects.filter(domain__istartswith=f'{value}.').exists():
-            raise serializers.ValidationError('This subdomain is already taken.')
+        if Domain.objects.filter(domain__istartswith=f'{value}.').exists() or schema_exists(schema_name_for(value)):
+            raise serializers.ValidationError('That web address is already taken. Please choose another.')
         return value
 
     def validate_business_name(self, value):

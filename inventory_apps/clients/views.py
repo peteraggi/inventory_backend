@@ -5,6 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import views, generics, status, permissions
 from rest_framework.response import Response
+from django.db import IntegrityError
 from django_tenants.utils import schema_context
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -20,6 +21,7 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 from inventory_apps.erp_base.rbac_constants import DEFAULT_ROLE_PERMISSIONS
+from inventory_apps.clients.onboarding import discard_partial_setup, schema_name_for
 
 DEFAULT_ROLES = [
     {
@@ -59,11 +61,6 @@ DEFAULT_ROLES = [
         },
     },
 ]
-
-
-def _schema_name_from_subdomain(subdomain: str) -> str:
-    """Convert subdomain to a valid, lowercase PostgreSQL schema identifier."""
-    return re.sub(r"[^a-z0-9]", "_", subdomain.lower())
 
 
 DEFAULT_ACCOUNTS = [
@@ -339,13 +336,19 @@ class OnboardingAPIView(views.APIView):
     )
     def post(self, request):
         serializer = OnboardingSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            field, messages = next(iter(serializer.errors.items()))
+            return Response(
+                {"success": False, "error": str(messages[0]), "field": field},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         data = serializer.validated_data
 
         subdomain = data["subdomain"]
-        schema_name = _schema_name_from_subdomain(subdomain)
+        schema_name = schema_name_for(subdomain)
         full_domain = f"{subdomain}.{settings.BASE_DOMAIN}"
         store_name = data.get("store_name") or data["business_name"]
+        email = data["contact_email"]
 
         client = None
         try:
@@ -359,7 +362,7 @@ class OnboardingAPIView(views.APIView):
                 name=data["business_name"],
                 schema_name=schema_name,
                 contact_name=data["contact_name"],
-                contact_email=data["contact_email"],
+                contact_email=email,
                 contact_phone=data.get("contact_phone", ""),
                 plan=plan,
                 on_trial=True,
@@ -375,48 +378,55 @@ class OnboardingAPIView(views.APIView):
                 schema_name=schema_name,
                 store_name=store_name,
                 owner_name=data["contact_name"],
-                owner_email=data["contact_email"],
+                owner_email=email,
                 owner_password=data["password"],
                 owner_phone=data.get("contact_phone", ""),
             )
-
+        except IntegrityError:
+            logger.exception("Onboarding for %s clashed with an existing record", subdomain)
+            discard_partial_setup(client, schema_name, email)
             return Response(
                 {
-                    "success": True,
-                    "pending_approval": True,
-                    "message": (
-                        "Your business is registered and awaits approval from the platform team. "
-                        "You can sign in once it is approved."
-                    ),
-                    "tenant": {
-                        "id": str(client.id),
-                        "business_name": client.name,
-                        "subdomain": subdomain,
-                        "api_base_url": f"https://{full_domain}",
-                        "plan": plan.name if plan else "free",
-                        "on_trial": True,
-                        "trial_ends": str(trial_ends),
-                    },
-                    "owner": {
-                        "email": data["contact_email"],
-                        "name": data["contact_name"],
-                    },
+                    "success": False,
+                    "error": "Those details were just taken by another registration. Check them and try again.",
                 },
-                status=status.HTTP_201_CREATED,
+                status=status.HTTP_409_CONFLICT,
             )
-
-        except Exception as e:
-            logger.error(f"Onboarding failed for {subdomain}: {e}", exc_info=True)
-            if client and client.pk:
-                try:
-                    client.delete()
-                except Exception:
-                    pass
+        except Exception:
+            logger.exception("Onboarding failed for %s", subdomain)
+            discard_partial_setup(client, schema_name, email)
             return Response(
-                {"error": f"Onboarding failed: {str(e)}"},
+                {
+                    "success": False,
+                    "error": (
+                        "We could not set up your business just now. Nothing was saved, "
+                        "so you can try again in a few minutes."
+                    ),
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        return Response(
+            {
+                "success": True,
+                "pending_approval": True,
+                "message": (
+                    "Your business is registered and awaits approval from the platform team. "
+                    "You can sign in once it is approved."
+                ),
+                "tenant": {
+                    "id": str(client.id),
+                    "business_name": client.name,
+                    "subdomain": subdomain,
+                    "api_base_url": f"https://{full_domain}",
+                    "plan": plan.name if plan else "free",
+                    "on_trial": True,
+                    "trial_ends": str(trial_ends),
+                },
+                "owner": {"email": email, "name": data["contact_name"]},
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class WaitlistSignupAPIView(generics.CreateAPIView):
     """Public endpoint — captures pre-launch email signups. Re-submitting the

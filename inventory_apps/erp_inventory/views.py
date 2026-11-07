@@ -29,6 +29,7 @@ from inventory_apps.notifications.models import NotificationType
 from inventory_apps.notifications.services import NotificationService
 
 
+from inventory_core.errors import user_message
 class InventoryErrorMixin:
     """Every inventory endpoint returns {"success": False, "error": "..."} on failure."""
 
@@ -127,7 +128,7 @@ class StockPickingViewSet(InventoryErrorMixin, viewsets.ModelViewSet):
         try:
             StockService.validate_picking(picking)
         except ValueError as e:
-            raise ValidationError(str(e))
+            raise ValidationError(user_message(e, "This action could not be completed. Check the details and try again."))
         NotificationService.notify_picking_validated(request.user, picking)
         return Response(StockPickingSerializer(picking).data)
 
@@ -145,7 +146,7 @@ class StockPickingViewSet(InventoryErrorMixin, viewsets.ModelViewSet):
         try:
             returned = StockService.create_return_picking(picking)
         except ValueError as e:
-            raise ValidationError(str(e))
+            raise ValidationError(user_message(e, "This action could not be completed. Check the details and try again."))
         return Response(StockPickingSerializer(returned).data, status=status.HTTP_201_CREATED)
 
 
@@ -208,7 +209,7 @@ class StockQuantViewSet(InventoryErrorMixin, viewsets.ReadOnlyModelViewSet):
         try:
             applied = StockService.apply_quant_counts(counts)
         except ValueError as e:
-            raise ValidationError(str(e))
+            raise ValidationError(user_message(e, "This action could not be completed. Check the details and try again."))
         NotificationService.create_notification(
             user=request.user,
             notification_type=NotificationType.STOCK_COUNT_APPLIED,
@@ -232,7 +233,7 @@ class InventoryAdjustmentViewSet(InventoryErrorMixin, viewsets.ModelViewSet):
         try:
             StockService.apply_inventory_adjustment(adjustment)
         except ValueError as e:
-            raise ValidationError(str(e))
+            raise ValidationError(user_message(e, "This action could not be completed. Check the details and try again."))
         NotificationService.notify_adjustment_validated(request.user, adjustment)
         return Response(InventoryAdjustmentSerializer(adjustment).data)
 
@@ -252,7 +253,7 @@ class ReorderingRuleViewSet(InventoryErrorMixin, viewsets.ModelViewSet):
         try:
             created = StockService.run_replenishment()
         except ValueError as e:
-            raise ValidationError(str(e))
+            raise ValidationError(user_message(e, "This action could not be completed. Check the details and try again."))
         if created:
             NotificationService.create_notification(
                 user=request.user,
@@ -283,7 +284,7 @@ class ScrapOrderViewSet(InventoryErrorMixin, mixins.ListModelMixin, mixins.Creat
         try:
             StockService.validate_scrap(scrap)
         except ValueError as e:
-            raise ValidationError(str(e))
+            raise ValidationError(user_message(e, "This action could not be completed. Check the details and try again."))
         NotificationService.create_notification(
             user=request.user,
             notification_type=NotificationType.SCRAP_VALIDATED,

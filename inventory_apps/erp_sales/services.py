@@ -14,6 +14,7 @@ from inventory_apps.erp_sales.exceptions import (
 )
 
 
+from inventory_core.errors import user_message
 def _pickings_for(order):
     from inventory_apps.erp_inventory.models import StockPicking
     return StockPicking.objects.filter(origin=order.name)
@@ -39,7 +40,7 @@ class SalesService:
             try:
                 StockService.create_delivery_from_so(sale_order)
             except ValueError as e:
-                raise SalesOrderError(str(e))
+                raise SalesOrderError(user_message(e, "This sales order could not be updated."))
 
         sale_order.delivery_count = _pickings_for(sale_order).count()
         sale_order.save(update_fields=["delivery_count"])

@@ -23,6 +23,7 @@ import random
 import string
 import logging
 
+from inventory_core.errors import user_message
 logger = logging.getLogger(__name__)
 
 # ─── Reusable response schemas ────────────────────────────────────────────────
@@ -131,7 +132,7 @@ class RegisterView(generics.GenericAPIView):
         except Exception as e:
             logger.error(f'Error in user registration: {e}', exc_info=True)
             return Response(
-                {'error': f'Registration failed: {e}'},
+                {'error': 'We could not create your account. Please try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -696,7 +697,7 @@ class TeamInviteView(generics.GenericAPIView):
         except Exception as e:
             logger.error(f'Error inviting team member: {e}', exc_info=True)
             return Response(
-                {'error': f'Invite failed: {e}'},
+                {'error': 'We could not send the invitation. Please try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

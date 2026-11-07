@@ -19,6 +19,7 @@ from inventory_apps.erp_pos.exceptions import (
 )
 
 
+from inventory_core.errors import user_message
 class POSService:
 
     @classmethod
@@ -90,7 +91,7 @@ class POSService:
         try:
             StockService.validate_picking(picking, allow_negative=allow_negative)
         except ValueError as e:
-            raise StockUnavailableError(str(e))
+            raise StockUnavailableError(user_message(e, "There is not enough stock for this sale."))
 
     @classmethod
     def _cash_account(cls, method):
@@ -204,9 +205,9 @@ class POSService:
                     session=session,
                 )
         except (KeyError, ValueError, InvalidOperation) as e:
-            raise PaymentError(f"Offline sale {ref or '(no reference)'} is malformed: {e}")
+            raise PaymentError(f"Offline sale {ref or '(no reference)'} could not be processed: {user_message(e, 'its details are incomplete')}")
         except ObjectDoesNotExist as e:
-            raise PaymentError(f"Offline sale {ref or '(no reference)'} refers to unknown data: {e}")
+            raise PaymentError(f"Offline sale {ref or '(no reference)'} could not be processed: {user_message(e, 'its details no longer match this business')}")
         order.compute_totals()
         return order
 

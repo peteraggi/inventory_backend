@@ -10,6 +10,7 @@ from inventory_apps.erp_inventory.models import (
 from inventory_apps.erp_inventory.services import StockService
 
 
+from inventory_core.errors import user_message
 class StockLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockLocation
@@ -248,7 +249,7 @@ class ScrapOrderSerializer(serializers.ModelSerializer):
             try:
                 attrs["location"] = StockService.default_stock_location()
             except ValueError as e:
-                raise serializers.ValidationError({"location": str(e)})
+                raise serializers.ValidationError({"location": user_message(e, "This location is not valid for this warehouse.")})
         if attrs.get("scrap_location") is None:
             attrs["scrap_location"] = StockService.scrap_location()
         if attrs.get("quantity", Decimal("1")) <= 0:

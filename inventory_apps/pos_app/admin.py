@@ -18,6 +18,7 @@ from .models import (
 from django.urls import path
 
 
+from inventory_core.errors import user_message
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
     """Admin interface for Store model"""
@@ -501,7 +502,7 @@ class InvoiceAdmin(admin.ModelAdmin):
             return mark_safe(html)
         except Exception as e:
             return format_html(
-                '<span style="color: red;">Error loading items: {}</span>', str(e)
+                '<span style="color: red;">{}</span>', user_message(e, 'We could not load the items.')
             )
 
     item_summary.short_description = "Item Details"
