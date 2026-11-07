@@ -43,6 +43,18 @@ class PurchaseOrder(models.Model):
     notes = models.TextField(blank=True)
     origin = models.CharField(max_length=255, blank=True)
 
+    # ── OAS-style purchase order fields ──
+    buyer = models.ForeignKey(
+        "authentication.User", on_delete=models.SET_NULL, null=True, blank=True,
+        db_constraint=False, related_name="purchase_orders",
+        help_text="Who raised the order; their signature is printed on it.",
+    )
+    contact_person = models.CharField(max_length=255, blank=True)
+    validity_days = models.PositiveIntegerField(null=True, blank=True)
+    delivery_terms = models.CharField(max_length=255, blank=True)
+    payment_method_words = models.CharField(max_length=255, blank=True)
+    delivery_address = models.TextField(blank=True, help_text="Deliver-to address printed on the order.")
+
     amount_untaxed = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
     amount_tax = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
     amount_total = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0.00"))
