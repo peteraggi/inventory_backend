@@ -1,0 +1,59 @@
+D:\django-backend\logsinventory_backend\env\Lib\site-packages\rest_framework\fields.py:1014: UserWarning: min_value should be an integer or Decimal instance.
+  warnings.warn("min_value should be an integer or Decimal instance.")
+ERROR 2026-11-07 12:07:20,744 log 27060 2216 Internal Server Error: /admin/login/
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.UndefinedColumn: column clients_client.approval_status does not exist
+LINE 1: ...lient"."on_trial", "clients_client"."trial_ends", "clients_c...
+                                                             ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\utils\deprecation.py", line 308, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django_tenants\middleware\main.py", line 45, in process_request
+    tenant = self.get_tenant(domain_model, hostname)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django_tenants\middleware\main.py", line 29, in get_tenant
+    domain = domain_model.objects.select_related('tenant').get(domain=hostname)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\models\query.py", line 635, in get
+    num = len(clone)
+          ^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\models\query.py", line 372, in __len__
+    self._fetch_all()
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\models\query.py", line 2000, in _fetch_all
+    self._result_cache = list(self._iterable_class(self))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\models\query.py", line 95, in __iter__
+    results = compiler.execute_sql(
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\models\sql\compiler.py", line 1624, in execute_sql
+    cursor.execute(sql, params)
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "D:\django-backend\logsinventory_backend\env\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+django.db.utils.ProgrammingError: column clients_client.approval_status does not exist
+LINE 1: ...lient"."on_trial", "clients_client"."trial_ends", "clients_c...
+                                                             ^
+
+ERROR 2026-11-07 12:07:20,848 log 27060 2216 "GET /admin/login/ HTTP/1.1" 500 145

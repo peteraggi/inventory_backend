@@ -1,4 +1,3 @@
-from django.db.models import Count, Q, Sum
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -45,7 +44,7 @@ class PurchaseOrderViewSet(PurchaseErrorMixin, viewsets.ModelViewSet):
     Lines are locked after confirmation.
     """
     queryset = PurchaseOrder.objects.all().select_related(
-        "partner", "company", "currency", "payment_term", "buyer"
+        "partner", "company", "currency", "payment_term"
     ).prefetch_related("lines__product", "lines__taxes")
     permission_classes = [IsAuthenticated, HasErpPermission]
     erp_resource = "purchases"
@@ -69,37 +68,11 @@ class PurchaseOrderViewSet(PurchaseErrorMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if self.action in ("list", "summary"):
-            params = self.request.query_params
-            # `state__in=draft,sent` lists several states in one request.
-            if params.get("state__in"):
-                qs = qs.filter(state__in=params["state__in"].split(","))
-            if params.get("date_from"):
-                qs = qs.filter(date_order__date__gte=params["date_from"])
-            if params.get("date_to"):
-                qs = qs.filter(date_order__date__lte=params["date_to"])
-            if params.get("archived") == "true":
+        if self.action == "list":
+            if self.request.query_params.get("archived") == "true":
                 return qs.filter(active=False)
             return qs.filter(active=True)
         return qs
-
-    @action(detail=False)
-    def summary(self, request):
-        """Count and total per state, for the Purchase Orders analytics cards."""
-        qs = self.filter_queryset(self.get_queryset())
-        buckets = {
-            "all": Q(),
-            "draft": Q(state="draft"),
-            "sent": Q(state="sent"),
-            "purchase": Q(state="purchase"),
-            "done": Q(state="done"),
-            "cancel": Q(state="cancel"),
-        }
-        data = {}
-        for key, cond in buckets.items():
-            agg = qs.filter(cond).aggregate(count=Count("id"), total=Sum("amount_total"))
-            data[key] = {"count": agg["count"], "sum": agg["total"] or 0}
-        return Response(data)
 
     def _log(self, order, body, message_type="tracking"):
         ActivityLog.objects.create(
@@ -111,7 +84,7 @@ class PurchaseOrderViewSet(PurchaseErrorMixin, viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        order = serializer.save(buyer=self.request.user)
+        order = serializer.save()
         self._log(order, "Quotation created", message_type="note")
 
     def _format_tracked_value(self, field, value):
